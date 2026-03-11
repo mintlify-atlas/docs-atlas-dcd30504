@@ -1,0 +1,1580 @@
+---
+title: "@beztack/mercadopago"
+description: "Mercado Pago SDK for Beztack - Server and React integrations for payments and subscriptions"
+---
+
+## Overview
+
+`@beztack/mercadopago` provides a comprehensive SDK for integrating Mercado Pago payments and subscriptions into your Beztack application. It includes:
+
+- **Server-side client** for API interactions
+- **React components** for payments and subscriptions UI
+- **React Query hooks** for data fetching and mutations
+- **Type-safe schemas** with Zod validation
+- **i18n support** for Spanish and English
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @beztack/mercadopago
+```
+
+```bash pnpm
+pnpm add @beztack/mercadopago
+```
+
+```bash yarn
+yarn add @beztack/mercadopago
+```
+</CodeGroup>
+
+### Peer Dependencies
+
+```json
+{
+  "@tanstack/react-query": "^5.0.0",
+  "react": "^18.0.0 || ^19.0.0",
+  "zod": "^3.23.0"
+}
+```
+
+<Note>
+React and TanStack Query are optional if you only use the server-side SDK (`@beztack/mercadopago/server`).
+</Note>
+
+---
+
+## Server-Side SDK
+
+Import from `@beztack/mercadopago/server` to use the server-side client.
+
+### Creating a Client
+
+```typescript
+import { createMercadoPagoClient } from "@beztack/mercadopago/server"
+
+const mp = createMercadoPagoClient({
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
+  webhookSecret: process.env.MERCADO_PAGO_WEBHOOK_SECRET,
+  timeout: 30000,        // 30 seconds (default)
+  maxRetries: 3,         // Retry 429/5xx errors (default: 3)
+  initialRetryDelay: 1000, // 1 second (default)
+  integratorId: "your_integrator_id", // Optional
+})
+```
+
+<ParamField path="accessToken" type="string" required>
+  Your Mercado Pago access token
+</ParamField>
+
+<ParamField path="webhookSecret" type="string">
+  Secret for webhook signature validation
+</ParamField>
+
+<ParamField path="baseUrl" type="string" default="https://api.mercadopago.com">
+  API base URL (for testing)
+</ParamField>
+
+<ParamField path="timeout" type="number" default={30000}>
+  Request timeout in milliseconds
+</ParamField>
+
+<ParamField path="maxRetries" type="number" default={3}>
+  Maximum retry attempts for 429/5xx errors
+</ParamField>
+
+<ParamField path="initialRetryDelay" type="number" default={1000}>
+  Initial retry delay in milliseconds (exponential backoff)
+</ParamField>
+
+<ParamField path="integratorId" type="string">
+  Mercado Pago partner metrics tracking ID
+</ParamField>
+
+### Payments Module
+
+#### Get Payment
+
+```typescript
+const payment = await mp.payments.get("123456789")
+
+console.log(payment.status)           // "approved"
+console.log(payment.transaction_amount) // 100
+console.log(payment.payer?.email)      // "user@example.com"
+```
+
+<ResponseField name="id" type="number">
+  Payment ID
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Payment status: `pending`, `approved`, `authorized`, `in_process`, `in_mediation`, `rejected`, `cancelled`, `refunded`, `charged_back`
+</ResponseField>
+
+<ResponseField name="transaction_amount" type="number">
+  Payment amount
+</ResponseField>
+
+<ResponseField name="currency_id" type="string">
+  Currency code (e.g., "UYU", "USD", "ARS")
+</ResponseField>
+
+<ResponseField name="payer" type="object">
+  <ResponseField name="email" type="string">Payer email</ResponseField>
+  <ResponseField name="id" type="string">Payer ID</ResponseField>
+</ResponseField>
+
+#### Create Payment
+
+```typescript
+const payment = await mp.payments.create({
+  token: "card_token_from_sdk",
+  issuer_id: "visa",
+  payment_method_id: "visa",
+  transaction_amount: 100,
+  installments: 1,
+  payer: { email: "user@example.com" },
+})
+```
+
+#### Search Payments
+
+```typescript
+const results = await mp.payments.search({
+  status: "approved",
+  begin_date: "2024-01-01T00:00:00Z",
+  end_date: "2024-12-31T23:59:59Z",
+  limit: 50,
+  offset: 0,
+})
+
+console.log(results.paging.total)
+results.results.forEach(payment => {
+  console.log(payment.id, payment.status)
+})
+```
+
+#### Refund Payment
+
+```typescript
+// Full refund
+const refund = await mp.payments.refund("123456789")
+
+// Partial refund
+const partialRefund = await mp.payments.refund("123456789", 50.00)
+
+console.log(refund.status) // "approved" | "pending" | "rejected"
+```
+
+#### Get Refunds
+
+```typescript
+const refunds = await mp.payments.getRefunds("123456789")
+const totalRefunded = refunds.reduce((sum, r) => sum + r.amount, 0)
+```
+
+### Plans Module
+
+#### List Plans
+
+```typescript
+const { results } = await mp.plans.list({
+  status: "active",
+  limit: 50,
+  offset: 0,
+})
+```
+
+#### Get Plan
+
+```typescript
+const plan = await mp.plans.get("2c9380848...")
+
+console.log(plan.reason)
+console.log(plan.auto_recurring.transaction_amount)
+console.log(plan.auto_recurring.frequency) // 1
+console.log(plan.auto_recurring.frequency_type) // "months"
+```
+
+#### Create Plan
+
+```typescript
+const plan = await mp.plans.create({
+  reason: "Premium Monthly",
+  auto_recurring: {
+    frequency: 1,
+    frequency_type: "months",
+    transaction_amount: 1500,
+    currency_id: "UYU",
+    billing_day: 15,
+    billing_day_proportional: false,
+    free_trial: {
+      frequency: 7,
+      frequency_type: "days",
+    },
+  },
+  back_url: "https://your-site.com/callback",
+})
+
+console.log(plan.init_point) // Checkout URL
+```
+
+#### Update Plan
+
+```typescript
+const updated = await mp.plans.update("plan_123", {
+  auto_recurring: {
+    transaction_amount: 2000,
+    billing_day: 20,
+  },
+})
+```
+
+#### Deactivate Plan
+
+```typescript
+await mp.plans.deactivate("plan_123")
+```
+
+### Subscriptions Module
+
+#### Create Subscription
+
+```typescript
+// Checkout mode (redirect to Mercado Pago)
+const subscription = await mp.subscriptions.create({
+  preapproval_plan_id: "plan_123",
+  payer_email: "user@example.com",
+  back_url: "https://your-site.com/success",
+  external_reference: "user_456",
+  status: "pending", // User will authorize via checkout
+})
+
+console.log(subscription.init_point) // Redirect user here
+
+// Direct authorization (with card token)
+const authorized = await mp.subscriptions.create({
+  preapproval_plan_id: "plan_123",
+  payer_email: "user@example.com",
+  card_token_id: "card_token_from_sdk",
+  status: "authorized", // Immediately authorized
+})
+```
+
+#### Get Subscription
+
+```typescript
+const sub = await mp.subscriptions.get("sub_123")
+
+console.log(sub.status)            // "active"
+console.log(sub.next_payment_date) // "2024-02-15T00:00:00Z"
+console.log(sub.auto_recurring?.transaction_amount) // 1500
+```
+
+#### Update Subscription
+
+```typescript
+await mp.subscriptions.update("sub_123", {
+  reason: "Updated plan name",
+  external_reference: "new_ref",
+})
+```
+
+#### Pause Subscription
+
+```typescript
+await mp.subscriptions.pause("sub_123")
+```
+
+#### Resume Subscription
+
+```typescript
+await mp.subscriptions.resume("sub_123")
+```
+
+#### Cancel Subscription
+
+```typescript
+await mp.subscriptions.cancel("sub_123")
+```
+
+#### Search Subscriptions
+
+```typescript
+const { results, paging } = await mp.subscriptions.search({
+  payer_email: "user@example.com",
+  status: "active",
+  preapproval_plan_id: "plan_123",
+  limit: 50,
+})
+```
+
+#### List Invoices
+
+```typescript
+const invoices = await mp.subscriptions.listInvoices("sub_123", {
+  status: "processed",
+  limit: 20,
+})
+
+console.log(invoices.paging.total)
+invoices.results.forEach(invoice => {
+  console.log(invoice.debit_date, invoice.status)
+})
+```
+
+### Checkout Module
+
+#### Create Preference
+
+```typescript
+const preference = await mp.checkout.createPreference({
+  items: [
+    {
+      title: "Product Name",
+      quantity: 1,
+      unit_price: 100,
+      currency_id: "UYU",
+    },
+  ],
+  payer: {
+    email: "user@example.com",
+  },
+  back_urls: {
+    success: "https://your-site.com/success",
+    failure: "https://your-site.com/failure",
+    pending: "https://your-site.com/pending",
+  },
+  auto_return: "approved",
+  external_reference: "order_123",
+})
+
+console.log(preference.init_point) // Redirect user here
+```
+
+#### Get Preference
+
+```typescript
+const preference = await mp.checkout.getPreference("pref_123")
+```
+
+### Customers Module
+
+```typescript
+// Create customer
+const customer = await mp.customers.create({
+  email: "user@example.com",
+  first_name: "John",
+  last_name: "Doe",
+})
+
+// Get customer
+const customer = await mp.customers.get("customer_123")
+
+// Search by email
+const { results } = await mp.customers.searchByEmail("user@example.com")
+```
+
+### Invoices Module
+
+```typescript
+// Get invoice
+const invoice = await mp.invoices.get("invoice_123")
+
+// Search invoices
+const { results } = await mp.invoices.search({
+  preapproval_id: "sub_123",
+  status: "processed",
+})
+```
+
+### Merchant Orders Module
+
+```typescript
+const order = await mp.merchantOrders.get("order_123")
+
+console.log(order.status)
+console.log(order.payments)
+console.log(order.paid_amount)
+```
+
+### Chargebacks Module
+
+```typescript
+const chargeback = await mp.chargebacks.get("chargeback_123")
+
+console.log(chargeback.status)
+console.log(chargeback.amount)
+console.log(chargeback.reason?.description)
+```
+
+### Webhooks Module
+
+#### Validate Webhook
+
+```typescript
+// In your webhook handler
+const isValid = mp.webhooks.validate(
+  xSignature,  // x-signature header
+  xRequestId,  // x-request-id header
+  dataId       // data.id from webhook payload
+)
+
+if (!isValid) {
+  return new Response("Invalid signature", { status: 401 })
+}
+```
+
+<Tip>
+In development (when `NODE_ENV !== "production"`), webhook validation is skipped if `webhookSecret` is not configured.
+</Tip>
+
+#### Parse Webhook
+
+```typescript
+const payload = mp.webhooks.parse(rawBody)
+
+console.log(payload.type)   // "payment" | "subscription" | etc.
+console.log(payload.action) // "created" | "updated" | etc.
+console.log(payload.data.id) // Resource ID
+```
+
+### Error Handling
+
+The SDK throws `MercadoPagoError` instances:
+
+```typescript
+import { MercadoPagoError } from "@beztack/mercadopago/server"
+
+try {
+  const payment = await mp.payments.get("123")
+} catch (error) {
+  if (error instanceof MercadoPagoError) {
+    console.error(error.statusCode)  // HTTP status code
+    console.error(error.message)     // Error message
+    console.error(error.errorCause)  // Original error
+    console.error(error.retryable)   // Whether error is retryable
+  }
+}
+```
+
+---
+
+## React SDK
+
+Import from `@beztack/mercadopago/react` to use React components and hooks.
+
+### Setup
+
+Wrap your app with `MercadoPagoProvider`:
+
+```tsx
+import { MercadoPagoProvider } from "@beztack/mercadopago/react"
+
+function App() {
+  return (
+    <MercadoPagoProvider
+      publicKey={import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY}
+      apiBaseUrl={import.meta.env.VITE_API_URL}
+      locale="es-UY"
+    >
+      <YourApp />
+    </MercadoPagoProvider>
+  )
+}
+```
+
+<ParamField path="publicKey" type="string" required>
+  Mercado Pago public key
+</ParamField>
+
+<ParamField path="apiBaseUrl" type="string" required>
+  Your API base URL (for calling your backend endpoints)
+</ParamField>
+
+<ParamField path="locale" type="MercadoPagoLocale" default="es-UY">
+  Locale for Mercado Pago SDK: `es-UY`, `es-AR`, `es-CL`, `es-CO`, `es-MX`, `es-VE`, `es-PE`, `pt-BR`, `en-US`
+</ParamField>
+
+### Plans Hooks
+
+#### usePlans
+
+Fetch subscription plans with optional filtering:
+
+```tsx
+import { usePlans } from "@beztack/mercadopago/react"
+
+function PlansList() {
+  const { data, isLoading, error } = usePlans({
+    status: "active",
+    enabled: true,
+  })
+
+  if (isLoading) return <Spinner />
+  if (error) return <Error message={error.message} />
+
+  return (
+    <ul>
+      {data?.plans.map(plan => (
+        <li key={plan.id}>
+          {plan.reason} - {plan.transactionAmount} {plan.currencyId}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+<ResponseField name="data" type="PlansResponse">
+  <ResponseField name="plans" type="Plan[]">Array of plans</ResponseField>
+  <ResponseField name="total" type="number">Total count</ResponseField>
+  <ResponseField name="syncedAt" type="string | null">Last sync timestamp</ResponseField>
+</ResponseField>
+
+#### usePlan
+
+Fetch a single plan by ID:
+
+```tsx
+import { usePlan } from "@beztack/mercadopago/react"
+
+function PlanDetail({ planId }: { planId: string }) {
+  const { data: plan, isLoading } = usePlan(planId)
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <div>
+      <h2>{plan?.reason}</h2>
+      <p>{plan?.transactionAmount} {plan?.currencyId}</p>
+      <p>Frequency: {plan?.frequency} {plan?.frequencyType}</p>
+    </div>
+  )
+}
+```
+
+#### useCreatePlan
+
+Create a new subscription plan:
+
+```tsx
+import { useCreatePlan } from "@beztack/mercadopago/react"
+import { toast } from "sonner"
+
+function CreatePlanForm() {
+  const { mutate, isPending } = useCreatePlan({
+    onSuccess: (plan) => {
+      toast.success(`Plan ${plan.reason} created!`)
+    },
+    onError: (error) => {
+      toast.error(error.message)
+    },
+  })
+
+  const handleSubmit = (data: CreatePlanData) => {
+    mutate(data)
+  }
+
+  return <form onSubmit={handleSubmit}>...</form>
+}
+```
+
+#### useSyncPlans
+
+Sync plans from Mercado Pago API:
+
+```tsx
+import { useSyncPlans } from "@beztack/mercadopago/react"
+
+function SyncButton() {
+  const { mutate, isPending } = useSyncPlans({
+    onSuccess: (result) => {
+      console.log(`Synced ${result.stats.total} plans`)
+    },
+  })
+
+  return (
+    <button onClick={() => mutate()} disabled={isPending}>
+      {isPending ? "Syncing..." : "Sync Plans"}
+    </button>
+  )
+}
+```
+
+#### useRefreshPlans
+
+Force refresh plans cache:
+
+```tsx
+import { useRefreshPlans } from "@beztack/mercadopago/react"
+
+function RefreshButton() {
+  const { mutate, isPending } = useRefreshPlans()
+
+  return (
+    <button onClick={() => mutate()}>
+      {isPending ? "Refreshing..." : "Refresh"}
+    </button>
+  )
+}
+```
+
+### Subscriptions Hooks
+
+#### useSubscriptions
+
+Fetch user subscriptions:
+
+```tsx
+import { useSubscriptions } from "@beztack/mercadopago/react"
+
+function SubscriptionsList() {
+  const { data, isLoading } = useSubscriptions({
+    status: "active",
+    limit: 10,
+  })
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <ul>
+      {data?.subscriptions.map(sub => (
+        <li key={sub.id}>
+          {sub.reason} - {sub.status}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+#### useSubscription
+
+Fetch a single subscription:
+
+```tsx
+import { useSubscription } from "@beztack/mercadopago/react"
+
+function SubscriptionDetail({ id }: { id: string }) {
+  const { data: sub, isLoading } = useSubscription(id)
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <div>
+      <h2>{sub?.reason}</h2>
+      <p>Status: {sub?.status}</p>
+      <p>Next payment: {sub?.nextPaymentDate}</p>
+    </div>
+  )
+}
+```
+
+#### useSubscriptionInvoices
+
+Fetch invoices for a subscription:
+
+```tsx
+import { useSubscriptionInvoices } from "@beztack/mercadopago/react"
+
+function InvoicesList({ subscriptionId }: { subscriptionId: string }) {
+  const { data, isLoading } = useSubscriptionInvoices(subscriptionId, {
+    status: "processed",
+    limit: 20,
+  })
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <ul>
+      {data?.invoices.map(invoice => (
+        <li key={invoice.id}>
+          {invoice.debitDate} - {invoice.transactionAmount}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+#### usePauseSubscription
+
+Pause a subscription:
+
+```tsx
+import { usePauseSubscription } from "@beztack/mercadopago/react"
+
+function PauseButton({ subscriptionId }: { subscriptionId: string }) {
+  const { mutate, isPending } = usePauseSubscription()
+
+  return (
+    <button
+      onClick={() => mutate(subscriptionId)}
+      disabled={isPending}
+    >
+      {isPending ? "Pausing..." : "Pause"}
+    </button>
+  )
+}
+```
+
+#### useResumeSubscription
+
+Resume a paused subscription:
+
+```tsx
+import { useResumeSubscription } from "@beztack/mercadopago/react"
+
+function ResumeButton({ subscriptionId }: { subscriptionId: string }) {
+  const { mutate, isPending } = useResumeSubscription()
+
+  return (
+    <button onClick={() => mutate(subscriptionId)}>
+      {isPending ? "Resuming..." : "Resume"}
+    </button>
+  )
+}
+```
+
+#### useCancelSubscription
+
+Cancel a subscription:
+
+```tsx
+import { useCancelSubscription } from "@beztack/mercadopago/react"
+
+function CancelButton({ subscriptionId }: { subscriptionId: string }) {
+  const { mutate, isPending } = useCancelSubscription()
+
+  const handleCancel = () => {
+    if (confirm("Are you sure?")) {
+      mutate(subscriptionId)
+    }
+  }
+
+  return (
+    <button onClick={handleCancel}>
+      {isPending ? "Cancelling..." : "Cancel"}
+    </button>
+  )
+}
+```
+
+### Payment Events Hook
+
+#### usePaymentEvents
+
+Real-time payment events via Server-Sent Events (SSE):
+
+```tsx
+import { usePaymentEvents } from "@beztack/mercadopago/react"
+
+function PaymentEventsMonitor() {
+  const { events, connectionStatus, clearEvents, reconnect } = usePaymentEvents({
+    enabled: true,
+    onEvent: (event) => {
+      console.log("New event:", event.type, event.resourceId)
+      toast.info(`${event.type}: ${event.action}`)
+    },
+    onError: (error) => {
+      console.error("SSE error:", error)
+    },
+    reconnectInterval: 5000,
+    maxRetries: 5,
+  })
+
+  return (
+    <div>
+      <p>Status: {connectionStatus}</p>
+      <button onClick={reconnect}>Reconnect</button>
+      <button onClick={clearEvents}>Clear</button>
+      
+      <ul>
+        {events.map(event => (
+          <li key={event.id}>
+            {event.type} - {event.action} - {event.resourceId}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+<ParamField path="enabled" type="boolean" default={true}>
+  Enable/disable the SSE connection
+</ParamField>
+
+<ParamField path="onEvent" type="(event: PaymentEvent) => void">
+  Callback for each event received
+</ParamField>
+
+<ParamField path="onError" type="(error: Error) => void">
+  Callback for errors
+</ParamField>
+
+<ParamField path="reconnectInterval" type="number" default={5000}>
+  Reconnection interval in milliseconds
+</ParamField>
+
+<ParamField path="maxRetries" type="number" default={5}>
+  Maximum reconnection attempts
+</ParamField>
+
+<ResponseField name="events" type="PaymentEvent[]">
+  Array of received events (max 100)
+</ResponseField>
+
+<ResponseField name="connectionStatus" type="ConnectionStatus">
+  Current connection status: `connecting`, `connected`, `disconnected`
+</ResponseField>
+
+<ResponseField name="clearEvents" type="() => void">
+  Clear all stored events
+</ResponseField>
+
+<ResponseField name="reconnect" type="() => void">
+  Manually reconnect
+</ResponseField>
+
+### React Components
+
+#### CheckoutButton
+
+Button that creates a Mercado Pago preference and opens checkout:
+
+```tsx
+import { CheckoutButton } from "@beztack/mercadopago/react"
+
+function BuyProduct() {
+  return (
+    <CheckoutButton
+      title="Premium Plan"
+      unitPrice={1500}
+      quantity={1}
+      description="Monthly subscription"
+      pictureUrl="https://example.com/product.jpg"
+      onPreferenceCreated={(id) => console.log("Preference:", id)}
+      onError={(error) => toast.error(error.message)}
+    />
+  )
+}
+```
+
+Custom render:
+
+```tsx
+<CheckoutButton
+  title="Product"
+  unitPrice={100}
+  renderTrigger={({ onClick, isLoading }) => (
+    <Button onClick={onClick} disabled={isLoading}>
+      {isLoading ? "Loading..." : "Buy Now"}
+    </Button>
+  )}
+/>
+```
+
+#### SubscriptionCard
+
+Display subscription details with status badge:
+
+```tsx
+import { SubscriptionCard } from "@beztack/mercadopago/react"
+
+function MySubscription({ subscription }) {
+  return (
+    <SubscriptionCard
+      subscription={subscription}
+      locale="es-UY"
+      showNextPayment
+      showStats
+      onClick={(sub) => navigate(`/subscription/${sub.id}`)}
+    />
+  )
+}
+```
+
+Custom render with shadcn/ui:
+
+```tsx
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+
+<SubscriptionCard
+  subscription={sub}
+  render={({ subscription, statusConfig, formattedPrice, formattedFrequency }) => (
+    <Card>
+      <CardHeader>
+        <CardTitle>{subscription.reason}</CardTitle>
+        <Badge className={statusConfig.bgColor}>
+          {statusConfig.label}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold">{formattedPrice}</p>
+        <p className="text-sm text-muted-foreground">{formattedFrequency}</p>
+      </CardContent>
+    </Card>
+  )}
+/>
+```
+
+#### SubscriptionList
+
+Display a list of subscriptions:
+
+```tsx
+import { SubscriptionList } from "@beztack/mercadopago/react"
+
+function MySubscriptions() {
+  return (
+    <SubscriptionList
+      subscriptions={data?.subscriptions ?? []}
+      locale="es-UY"
+      emptyMessage="No subscriptions found"
+      onSubscriptionClick={(sub) => navigate(`/subscription/${sub.id}`)}
+    />
+  )
+}
+```
+
+Custom render:
+
+```tsx
+<SubscriptionList
+  subscriptions={subscriptions}
+  render={({ subscriptions }) => (
+    <div className="grid gap-4 md:grid-cols-2">
+      {subscriptions.map(sub => (
+        <CustomSubscriptionCard key={sub.id} subscription={sub} />
+      ))}
+    </div>
+  )}
+/>
+```
+
+#### SubscriptionActions
+
+Action buttons for subscription management:
+
+```tsx
+import { SubscriptionActions } from "@beztack/mercadopago/react"
+
+function SubscriptionPage({ subscription }) {
+  return (
+    <SubscriptionActions
+      subscription={subscription}
+      locale="es-UY"
+      onSuccess={(action, result) => {
+        toast.success(`Subscription ${action}!`)
+      }}
+      onError={(action, error) => {
+        toast.error(error.message)
+      }}
+      confirmCancel
+    />
+  )
+}
+```
+
+Custom render:
+
+```tsx
+<SubscriptionActions
+  subscription={sub}
+  render={({ actions, isLoading }) => (
+    <div className="flex gap-2">
+      {actions.map(action => (
+        <Button
+          key={action.type}
+          onClick={action.onClick}
+          disabled={isLoading}
+          variant={action.variant}
+        >
+          {action.label}
+        </Button>
+      ))}
+    </div>
+  )}
+/>
+```
+
+#### BillingHistory
+
+Display subscription invoice history:
+
+```tsx
+import { BillingHistory } from "@beztack/mercadopago/react"
+
+function SubscriptionBilling({ subscriptionId }) {
+  return (
+    <BillingHistory
+      subscriptionId={subscriptionId}
+      locale="es-UY"
+      limit={20}
+    />
+  )
+}
+```
+
+Custom render:
+
+```tsx
+<BillingHistory
+  subscriptionId={subscriptionId}
+  render={({ invoices, isLoading, error }) => (
+    <Table>
+      <TableBody>
+        {invoices.map(invoice => (
+          <TableRow key={invoice.id}>
+            <TableCell>{invoice.formattedDate}</TableCell>
+            <TableCell>{invoice.formattedAmount}</TableCell>
+            <TableCell>
+              <PaymentStatusBadge status={invoice.status} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  )}
+/>
+```
+
+#### PaymentStatusBadge
+
+Display payment status with color-coded badge:
+
+```tsx
+import { PaymentStatusBadge } from "@beztack/mercadopago/react"
+
+function PaymentRow({ payment }) {
+  return (
+    <tr>
+      <td>{payment.id}</td>
+      <td>
+        <PaymentStatusBadge status={payment.status} locale="es-UY" />
+      </td>
+    </tr>
+  )
+}
+```
+
+Custom render:
+
+```tsx
+<PaymentStatusBadge
+  status="approved"
+  render={({ label, bgColor, color }) => (
+    <Badge className={`${bgColor} ${color}`}>
+      {label}
+    </Badge>
+  )}
+/>
+```
+
+#### SubscriptionStatusBadge
+
+Display subscription status badge:
+
+```tsx
+import { SubscriptionStatusBadge } from "@beztack/mercadopago/react"
+
+<SubscriptionStatusBadge status="active" locale="en-US" />
+```
+
+#### CardForm
+
+Mercado Pago card form component:
+
+```tsx
+import { CardForm } from "@beztack/mercadopago/react"
+
+function PaymentForm() {
+  return (
+    <CardForm
+      amount={1500}
+      onSubmit={async (data) => {
+        const result = await processPayment(data)
+        console.log(result)
+      }}
+      onError={(error) => toast.error(error.message)}
+    />
+  )
+}
+```
+
+#### PaymentBrick
+
+Mercado Pago Payment Brick component:
+
+```tsx
+import { PaymentBrick } from "@beztack/mercadopago/react"
+
+function Checkout() {
+  return (
+    <PaymentBrick
+      amount={1500}
+      onSubmit={async (data) => {
+        const result = await processPayment(data)
+        return result
+      }}
+      onReady={() => console.log("Brick ready")}
+      onError={(error) => console.error(error)}
+    />
+  )
+}
+```
+
+---
+
+## Type Definitions
+
+### Core Types
+
+All types are exported from the main entry point:
+
+```typescript
+import type {
+  // Plan types
+  Plan,
+  PlanStatus,
+  CreatePlanData,
+  CreatePlanResponse,
+  PlansResponse,
+  FrequencyType,
+  
+  // Subscription types
+  Subscription,
+  SubscriptionStatus,
+  CreateSubscriptionData,
+  CreateSubscriptionResponse,
+  SubscriptionsSearchResponse,
+  
+  // Payment types
+  PaymentStatus,
+  MPPaymentResponse,
+  MPPaymentSearchParams,
+  MPPaymentSearchResponse,
+  ProcessPaymentData,
+  ProcessPaymentResponse,
+  
+  // Preference types
+  PreferenceItem,
+  PreferencePayer,
+  PreferenceBackUrls,
+  CreatePreferenceData,
+  PreferenceResponse,
+  
+  // MP API types
+  MPPreapprovalPlan,
+  MPPreapproval,
+  MPSubscriptionResponse,
+  MPInvoiceResponse,
+  MPInvoiceSearchResponse,
+  MPMerchantOrderResponse,
+  MPChargebackResponse,
+  MPRefundResponse,
+  
+  // Webhook types
+  WebhookPayload,
+} from "@beztack/mercadopago"
+```
+
+### Validation Schemas
+
+Zod schemas for input validation:
+
+```typescript
+import {
+  createPlanSchema,
+  createSubscriptionSchema,
+  frequencyTypeSchema,
+  planStatusSchema,
+  subscriptionStatusSchema,
+} from "@beztack/mercadopago"
+
+// Validate plan creation data
+const result = createPlanSchema.safeParse(formData)
+if (!result.success) {
+  console.error(result.error.errors)
+}
+
+// Validate subscription data
+const subResult = createSubscriptionSchema.safeParse(data)
+```
+
+**`createPlanSchema`** validates:
+- `reason`: 3-100 characters
+- `auto_recurring.frequency`: 1-12
+- `auto_recurring.frequency_type`: "days" | "months"
+- `auto_recurring.transaction_amount`: positive, max 1,000,000
+- `auto_recurring.currency_id`: required string
+- `auto_recurring.billing_day`: 1-28 (optional)
+- `back_url`: valid URL (optional)
+
+**`createSubscriptionSchema`** validates:
+- `preapproval_plan_id`: required string
+- `payer_email`: valid email address
+- `card_token_id`: optional string
+- `back_url`: valid URL (optional)
+- `external_reference`: optional string
+
+---
+
+## i18n Utilities
+
+### Supported Locales
+
+```typescript
+type SupportedLocale = "es-UY" | "es" | "en-US" | "en"
+```
+
+Default locale: `es-UY`
+
+### Translation Functions
+
+#### getTranslations
+
+Get full translations object:
+
+```typescript
+import { getTranslations } from "@beztack/mercadopago"
+
+const t = getTranslations("es-UY")
+console.log(t.paymentStatus.approved)    // "Aprobado"
+console.log(t.components.billingHistory) // "Historial de Facturación"
+```
+
+#### t (Translate)
+
+Get specific translation by path:
+
+```typescript
+import { t } from "@beztack/mercadopago"
+
+t("es", "components.billingHistory")  // "Historial de Facturación"
+t("en", "components.billingHistory")  // "Billing History"
+
+// With parameters
+t("es", "frequency.everyN", { n: 3, unit: "meses" }) // "cada 3 meses"
+```
+
+#### getPaymentStatusLabel
+
+```typescript
+import { getPaymentStatusLabel } from "@beztack/mercadopago"
+
+getPaymentStatusLabel("approved", "es")  // "Aprobado"
+getPaymentStatusLabel("approved", "en")  // "Approved"
+getPaymentStatusLabel("rejected", "es")  // "Rechazado"
+```
+
+#### getSubscriptionStatusLabel
+
+```typescript
+import { getSubscriptionStatusLabel } from "@beztack/mercadopago"
+
+getSubscriptionStatusLabel("active", "es")    // "Activa"
+getSubscriptionStatusLabel("paused", "en")    // "Paused"
+getSubscriptionStatusLabel("cancelled", "es") // "Cancelada"
+```
+
+#### getPlanStatusLabel
+
+```typescript
+import { getPlanStatusLabel } from "@beztack/mercadopago"
+
+getPlanStatusLabel("active", "es")   // "Activo"
+getPlanStatusLabel("inactive", "en") // "Inactive"
+```
+
+#### formatFrequencyLocalized
+
+```typescript
+import { formatFrequencyLocalized } from "@beztack/mercadopago"
+
+formatFrequencyLocalized(1, "months", "es") // "cada mes"
+formatFrequencyLocalized(3, "months", "es") // "cada 3 meses"
+formatFrequencyLocalized(1, "days", "en")   // "every day"
+formatFrequencyLocalized(7, "days", "en")   // "every 7 days"
+```
+
+#### formatPriceLocalized
+
+```typescript
+import { formatPriceLocalized } from "@beztack/mercadopago"
+
+formatPriceLocalized(1500, "UYU", "es-UY")  // "$ 1.500"
+formatPriceLocalized(99.99, "USD", "en-US") // "$99.99"
+formatPriceLocalized("250.50", "UYU", "es") // "$ 250,50"
+```
+
+### Utility Functions
+
+#### formatPlanPrice
+
+```typescript
+import { formatPlanPrice } from "@beztack/mercadopago"
+
+formatPlanPrice(1500, "UYU")  // "$ 1.500"
+formatPlanPrice("99.99", "USD") // "$99.99"
+```
+
+#### formatFrequency
+
+```typescript
+import { formatFrequency } from "@beztack/mercadopago"
+
+formatFrequency(1, "months") // "cada mes"
+formatFrequency(3, "months") // "cada 3 meses"
+formatFrequency(7, "days")   // "cada 7 días"
+```
+
+#### getStatusLabel
+
+```typescript
+import { getStatusLabel } from "@beztack/mercadopago"
+
+getStatusLabel("active")    // "Activa"
+getStatusLabel("paused")    // "Pausada"
+getStatusLabel("cancelled") // "Cancelada"
+```
+
+#### getStatusColor
+
+```typescript
+import { getStatusColor } from "@beztack/mercadopago"
+
+getStatusColor("active")    // "bg-green-500"
+getStatusColor("paused")    // "bg-orange-500"
+getStatusColor("cancelled") // "bg-red-500"
+```
+
+#### parseDate
+
+```typescript
+import { parseDate } from "@beztack/mercadopago"
+
+const date = parseDate("2024-01-15T00:00:00Z") // Date object
+const invalid = parseDate(null) // null
+```
+
+#### toStringId
+
+```typescript
+import { toStringId } from "@beztack/mercadopago"
+
+toStringId(123)       // "123"
+toStringId("abc")     // "abc"
+toStringId(null)      // null
+toStringId(undefined) // null
+```
+
+---
+
+## Real Usage Examples
+
+### Complete Subscription Flow
+
+```tsx
+import {
+  MercadoPagoProvider,
+  usePlans,
+  CheckoutButton,
+  SubscriptionList,
+  useSubscriptions,
+} from "@beztack/mercadopago/react"
+
+// 1. Provider setup
+function App() {
+  return (
+    <MercadoPagoProvider
+      publicKey={import.meta.env.VITE_MERCADO_PAGO_PUBLIC_KEY}
+      apiBaseUrl={import.meta.env.VITE_API_URL}
+      locale="es-UY"
+    >
+      <Router />
+    </MercadoPagoProvider>
+  )
+}
+
+// 2. Browse and subscribe to plans
+function PlansPage() {
+  const { data, isLoading } = usePlans({ status: "active" })
+
+  if (isLoading) return <Spinner />
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {data?.plans.map(plan => (
+        <Card key={plan.id}>
+          <CardHeader>
+            <CardTitle>{plan.reason}</CardTitle>
+            <p className="text-2xl">{plan.transactionAmount} {plan.currencyId}</p>
+          </CardHeader>
+          <CardFooter>
+            <CheckoutButton
+              title={plan.reason}
+              unitPrice={Number(plan.transactionAmount)}
+              onPreferenceCreated={() => toast.success("Redirecting...")}
+              renderTrigger={({ onClick, isLoading }) => (
+                <Button onClick={onClick} disabled={isLoading} className="w-full">
+                  {isLoading ? "Loading..." : "Subscribe"}
+                </Button>
+              )}
+            />
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// 3. Manage subscriptions
+function MySubscriptionsPage() {
+  const { data, isLoading } = useSubscriptions()
+
+  return (
+    <div>
+      <h1>My Subscriptions</h1>
+      <SubscriptionList
+        subscriptions={data?.subscriptions ?? []}
+        onSubscriptionClick={(sub) => navigate(`/subscription/${sub.id}`)}
+      />
+    </div>
+  )
+}
+```
+
+### Server-Side Webhook Handler
+
+```typescript
+import { createMercadoPagoClient } from "@beztack/mercadopago/server"
+import { defineEventHandler, readRawBody } from "h3"
+
+const mp = createMercadoPagoClient({
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
+  webhookSecret: process.env.MERCADO_PAGO_WEBHOOK_SECRET,
+})
+
+export default defineEventHandler(async (event) => {
+  const xSignature = event.headers.get("x-signature")
+  const xRequestId = event.headers.get("x-request-id")
+  const rawBody = await readRawBody(event)
+  
+  if (!rawBody) {
+    throw createError({ statusCode: 400, message: "No body" })
+  }
+
+  const payload = mp.webhooks.parse(rawBody)
+  const dataId = payload.data.id
+
+  // Validate signature
+  const isValid = mp.webhooks.validate(xSignature, xRequestId, dataId)
+  if (!isValid) {
+    throw createError({ statusCode: 401, message: "Invalid signature" })
+  }
+
+  // Handle different event types
+  if (payload.type === "payment") {
+    const payment = await mp.payments.get(dataId)
+    
+    if (payment.status === "approved") {
+      // Process approved payment
+      await processPayment(payment)
+    }
+  } else if (payload.type === "subscription") {
+    const subscription = await mp.subscriptions.get(dataId)
+    
+    // Update subscription in database
+    await updateSubscription(subscription)
+  }
+
+  return { received: true }
+})
+```
+
+### Query Key Management
+
+```tsx
+import { plansKeys, subscriptionsKeys } from "@beztack/mercadopago/react"
+import { useQueryClient } from "@tanstack/react-query"
+
+function AdminDashboard() {
+  const queryClient = useQueryClient()
+
+  const handlePlanCreated = () => {
+    // Invalidate all plans queries
+    queryClient.invalidateQueries({ queryKey: plansKeys.all })
+  }
+
+  const handleSubscriptionUpdated = (subscriptionId: string) => {
+    // Invalidate specific subscription
+    queryClient.invalidateQueries({
+      queryKey: subscriptionsKeys.detail(subscriptionId)
+    })
+    
+    // Invalidate all subscription lists
+    queryClient.invalidateQueries({
+      queryKey: subscriptionsKeys.lists()
+    })
+  }
+
+  return <Dashboard />
+}
+```
+
+---
+
+## API Reference
+
+### Server Client Methods
+
+<CardGroup cols={2}>
+  <Card title="Payments" icon="credit-card" href="#payments-module">
+    Create, get, search, and refund payments
+  </Card>
+  <Card title="Plans" icon="layer-group" href="#plans-module">
+    Manage subscription plans
+  </Card>
+  <Card title="Subscriptions" icon="repeat" href="#subscriptions-module">
+    Create and manage subscriptions
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="#webhooks-module">
+    Validate and parse webhook events
+  </Card>
+</CardGroup>
+
+### React Hooks
+
+<CardGroup cols={2}>
+  <Card title="Plans Hooks" icon="react" href="#plans-hooks">
+    usePlans, usePlan, useCreatePlan, useSyncPlans
+  </Card>
+  <Card title="Subscriptions Hooks" icon="react" href="#subscriptions-hooks">
+    useSubscriptions, useSubscription, usePauseSubscription
+  </Card>
+  <Card title="Payment Events" icon="bolt" href="#payment-events-hook">
+    usePaymentEvents - Real-time SSE updates
+  </Card>
+</CardGroup>
+
+### React Components
+
+<CardGroup cols={2}>
+  <Card title="CheckoutButton" icon="shopping-cart" href="#checkoutbutton">
+    One-click checkout button
+  </Card>
+  <Card title="SubscriptionCard" icon="id-card" href="#subscriptioncard">
+    Display subscription details
+  </Card>
+  <Card title="SubscriptionActions" icon="sliders" href="#subscriptionactions">
+    Pause, resume, cancel buttons
+  </Card>
+  <Card title="BillingHistory" icon="receipt" href="#billinghistory">
+    Invoice history table
+  </Card>
+</CardGroup>

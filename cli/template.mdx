@@ -23,6 +23,9 @@ beztack template <subcommand> [options]
   <Card title="apply" icon="play">
     Apply the update plan to your project
   </Card>
+  <Card title="rollback" icon="rotate-left">
+    Rollback the last template update
+  </Card>
   <Card title="inspect" icon="magnifying-glass">
     Launch an interactive web viewer for changes
   </Card>
@@ -204,17 +207,42 @@ Template apply finished
   ```
 </ParamField>
 
-### Snapshots and Rollback
+### Snapshots
 
 When you run `apply`, Beztack automatically creates a snapshot of your project. If the apply fails, it automatically rolls back to the snapshot.
 
-You can also manually rollback using:
+<Note>
+  Snapshots are stored in `.beztack/snapshots/` and named with a timestamp and hash (e.g., `20260311-143022-abc123`).
+</Note>
+
+## Subcommand: rollback
+
+Rollback your project to the state before the last `apply` operation. This uses the most recent snapshot to restore your files.
 
 ```bash
 beztack template rollback
 ```
 
-This restores your project to the state before the last `apply` operation.
+**Output**:
+```
+Template rollback complete
+- Snapshot: 20260311-143022-abc123
+- Restored: 22 files
+- Your project has been reverted to the state before the last apply
+```
+
+<Warning>
+  Rollback only restores files that were in the snapshot. Any new files created after the apply will not be removed. You may need to manually clean up.
+</Warning>
+
+**Use Cases:**
+- An apply introduced breaking changes
+- Conflicts were resolved incorrectly
+- Need to revert to test a different approach
+
+<Tip>
+  Always commit your work to git before running `apply` as an additional safety measure.
+</Tip>
 
 ## Subcommand: inspect
 

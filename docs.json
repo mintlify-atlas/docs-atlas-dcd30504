@@ -60,6 +60,7 @@
               "packages/db",
               "packages/email",
               "packages/env",
+              "packages/mercadopago",
               "packages/ocr",
               "packages/state"
             ]
