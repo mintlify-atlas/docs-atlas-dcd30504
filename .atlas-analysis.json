@@ -1,0 +1,117 @@
+{
+  "projectType": "framework",
+  "projectName": "Beztack",
+  "projectDescription": "Production-ready TypeScript monorepo starter with modern tools and best practices built-in",
+  "theme": "aspen",
+  "primaryColor": "#f4c05c",
+  "lightColor": "#27659a",
+  "darkColor": "#8c7c4c",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/monorepo",
+              "concepts/modules"
+            ]
+          },
+          {
+            "group": "Apps",
+            "pages": [
+              "apps/ui",
+              "apps/api",
+              "apps/docs"
+            ]
+          },
+          {
+            "group": "Packages",
+            "pages": [
+              "packages/ai",
+              "packages/cli",
+              "packages/db",
+              "packages/email",
+              "packages/env",
+              "packages/ocr",
+              "packages/state"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/authentication",
+              "guides/database",
+              "guides/payments",
+              "guides/deployment",
+              "guides/environment-variables"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/create",
+              "cli/init",
+              "cli/template"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Modules",
+            "pages": [
+              "api/ai",
+              "api/db",
+              "api/email",
+              "api/env",
+              "api/state"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "NX monorepo with optimized build system",
+    "React 19 + Vite frontend with shadcn/ui",
+    "Nitro backend with file-based routing",
+    "Better Auth with 2FA and organizations",
+    "Drizzle ORM for type-safe database access",
+    "Payment integration (Polar & Mercado Pago)",
+    "AI SDK with Amazon Bedrock",
+    "CLI for project scaffolding and module management",
+    "Type-safe environment validation",
+    "URL state management with nuqs"
+  ],
+  "publicApiSurface": [
+    "beztack create",
+    "beztack init",
+    "beztack template",
+    "@beztack/ai",
+    "@beztack/db",
+    "@beztack/email",
+    "@beztack/env",
+    "@beztack/state",
+    "@beztack/cli",
+    "@beztack/ocr"
+  ]
+}
