@@ -1,0 +1,214 @@
+---
+title: "@beztack/ai"
+description: "AI SDK integration with Amazon Bedrock provider for Beztack applications"
+---
+
+The `@beztack/ai` package provides a pre-configured AI SDK setup with Amazon Bedrock support, making it easy to integrate AI capabilities into your Beztack applications.
+
+## Installation
+
+This package is included in the Beztack monorepo:
+
+```bash
+pnpm add @beztack/ai
+```
+
+## Exports
+
+### bedrock
+
+Pre-configured Amazon Bedrock provider instance with US East 1 region and AWS credential chain.
+
+<ParamField path="bedrock" type="AmazonBedrockProvider">
+  Amazon Bedrock provider configured with:
+  - **Region**: `us-east-1`
+  - **Credentials**: AWS Node.js credential provider chain (supports environment variables, IAM roles, and credential files)
+</ParamField>
+
+<Accordion title="Type Signature">
+```typescript
+export const bedrock: AmazonBedrockProvider
+```
+</Accordion>
+
+### AI SDK Re-exports
+
+This package re-exports the entire [Vercel AI SDK](https://sdk.vercel.ai/docs) for convenience:
+
+```typescript
+export * from "ai"
+```
+
+<Accordion title="Key AI SDK Exports">
+<ResponseField name="generateText" type="function">
+  Generate text from a language model.
+  
+  ```typescript
+  function generateText(options: GenerateTextOptions): Promise<GenerateTextResult>
+  ```
+</ResponseField>
+
+<ResponseField name="streamText" type="function">
+  Stream text generation from a language model.
+  
+  ```typescript
+  function streamText(options: StreamTextOptions): Promise<StreamTextResult>
+  ```
+</ResponseField>
+
+<ResponseField name="generateObject" type="function">
+  Generate a structured object from a language model.
+  
+  ```typescript
+  function generateObject<T>(options: GenerateObjectOptions<T>): Promise<GenerateObjectResult<T>>
+  ```
+</ResponseField>
+
+<ResponseField name="streamObject" type="function">
+  Stream a structured object from a language model.
+  
+  ```typescript
+  function streamObject<T>(options: StreamObjectOptions<T>): Promise<StreamObjectResult<T>>
+  ```
+</ResponseField>
+</Accordion>
+
+## Usage Examples
+
+### Basic Text Generation
+
+```typescript
+import { bedrock, generateText } from "@beztack/ai"
+
+const result = await generateText({
+  model: bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0"),
+  prompt: "What is the meaning of life?",
+})
+
+console.log(result.text)
+```
+
+### Streaming Text Generation
+
+```typescript
+import { bedrock, streamText } from "@beztack/ai"
+
+const { textStream } = await streamText({
+  model: bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0"),
+  prompt: "Write a short story about TypeScript",
+})
+
+for await (const chunk of textStream) {
+  process.stdout.write(chunk)
+}
+```
+
+### Structured Object Generation
+
+```typescript
+import { bedrock, generateObject } from "@beztack/ai"
+import { z } from "zod"
+
+const result = await generateObject({
+  model: bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0"),
+  schema: z.object({
+    name: z.string(),
+    age: z.number(),
+    email: z.string().email(),
+  }),
+  prompt: "Generate a sample user profile",
+})
+
+console.log(result.object)
+// { name: "John Doe", age: 30, email: "john@example.com" }
+```
+
+### Using in API Routes (Nitro/h3)
+
+```typescript
+import { defineEventHandler } from "h3"
+import { bedrock, generateText } from "@beztack/ai"
+
+export default defineEventHandler(async (event) => {
+  const { prompt } = await readBody(event)
+
+  const result = await generateText({
+    model: bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0"),
+    prompt,
+  })
+
+  return { text: result.text }
+})
+```
+
+## AWS Credentials Setup
+
+The Bedrock provider uses the AWS SDK credential provider chain. Configure credentials via:
+
+### Environment Variables
+
+```bash
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-1
+```
+
+### IAM Roles (Recommended for Production)
+
+When deployed to AWS services (EC2, ECS, Lambda), the provider automatically uses the IAM role attached to the service.
+
+### AWS Credentials File
+
+```ini
+# ~/.aws/credentials
+[default]
+aws_access_key_id = your_access_key
+aws_secret_access_key = your_secret_key
+```
+
+## Available Models
+
+Amazon Bedrock supports multiple model providers:
+
+<CodeGroup>
+```typescript Anthropic Claude
+const model = bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0")
+const model = bedrock("anthropic.claude-3-opus-20240229-v1:0")
+const model = bedrock("anthropic.claude-3-haiku-20240307-v1:0")
+```
+
+```typescript Amazon Titan
+const model = bedrock("amazon.titan-text-express-v1")
+const model = bedrock("amazon.titan-text-lite-v1")
+```
+
+```typescript Meta Llama
+const model = bedrock("meta.llama3-70b-instruct-v1:0")
+const model = bedrock("meta.llama3-8b-instruct-v1:0")
+```
+</CodeGroup>
+
+## Type Safety
+
+All AI SDK functions are fully typed with TypeScript:
+
+```typescript
+import type { GenerateTextResult, StreamTextResult } from "@beztack/ai"
+
+// Type-safe result handling
+const result: GenerateTextResult = await generateText({
+  model: bedrock("anthropic.claude-3-5-sonnet-20241022-v2:0"),
+  prompt: "Hello",
+})
+
+// Access typed properties
+console.log(result.text)        // string
+console.log(result.finishReason) // FinishReason
+console.log(result.usage)        // TokenUsage
+```
+
+## Related Resources
+
+- [Vercel AI SDK Documentation](https://sdk.vercel.ai/docs)
+- [Amazon Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
+- [AWS SDK Credential Provider Chain](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/setting-credentials-node.html)

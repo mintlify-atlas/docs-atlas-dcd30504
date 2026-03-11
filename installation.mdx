@@ -1,0 +1,523 @@
+---
+title: Installation
+description: Detailed installation guide and configuration reference for Beztack
+---
+
+# Installation
+
+This guide covers the detailed installation process, prerequisites, environment configuration, and troubleshooting for Beztack.
+
+## Prerequisites
+
+Before installing Beztack, ensure your system meets these requirements:
+
+### Required Software
+
+<CardGroup cols={2}>
+  <Card title="Node.js 20+" icon="node-js">
+    Download from [nodejs.org](https://nodejs.org/)
+    ```bash
+    node --version  # Should be v20.0.0 or higher
+    ```
+  </Card>
+  <Card title="pnpm 9+" icon="package">
+    Install globally:
+    ```bash
+    npm install -g pnpm@9
+    pnpm --version  # Should be 9.0.0 or higher
+    ```
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Local or cloud PostgreSQL database (v14+ recommended)
+    - [PostgreSQL Downloads](https://www.postgresql.org/download/)
+    - Or use [Neon](https://neon.tech/), [Supabase](https://supabase.com/), or [Railway](https://railway.app/)
+  </Card>
+  <Card title="Git" icon="git">
+    For version control:
+    ```bash
+    git --version
+    ```
+  </Card>
+</CardGroup>
+
+### Optional Services
+
+- **Resend** - For sending emails (get API key at [resend.com](https://resend.com/))
+- **Polar** - For payments and subscriptions ([polar.sh](https://polar.sh/))
+- **Amazon Bedrock** - For AI features (requires AWS account)
+
+## Installation Methods
+
+### Method 1: Using the CLI (Recommended)
+
+The fastest way to create a new Beztack project:
+
+<Steps>
+  <Step title="Run the create command">
+    <CodeGroup>
+    ```bash pnpm
+    pnpm create beztack my-app
+    ```
+
+    ```bash npm
+    npx create-beztack my-app
+    ```
+
+    ```bash yarn
+    yarn create beztack my-app
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Follow the interactive prompts">
+    - Enter your project name (lowercase with hyphens)
+    - Add an optional description
+    - Choose whether to initialize Git
+    - Choose whether to install dependencies
+    - Select optional modules
+    - Pick a payment provider if using payments module
+  </Step>
+
+  <Step title="Navigate to your project">
+    ```bash
+    cd my-app
+    ```
+  </Step>
+</Steps>
+
+### Method 2: Non-Interactive Installation
+
+For CI/CD or automated setups:
+
+```bash
+pnpm create beztack my-app \
+  --yes \
+  --name my-app \
+  --description "My SaaS Application" \
+  --modules payments,email,ai \
+  --payment-provider polar \
+  --git \
+  --install
+```
+
+### Method 3: Clone from Template
+
+For advanced users who want to customize the template:
+
+```bash
+git clone --depth 1 https://github.com/V473r10/beztack.git my-app
+cd my-app
+pnpm install
+```
+
+## Environment Configuration
+
+### API Environment Variables
+
+Create `apps/api/.env` from the example:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+```
+
+Then configure the following variables:
+
+#### Database Configuration
+
+```bash apps/api/.env
+# PostgreSQL connection string
+DATABASE_URL="postgresql://username:password@host:port/database"
+```
+
+<Tip>
+**Local PostgreSQL example:**
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/myapp"
+```
+
+**Neon example:**
+```
+DATABASE_URL="postgresql://user:password@ep-xyz.us-east-2.aws.neon.tech/mydb?sslmode=require"
+```
+</Tip>
+
+#### Authentication Configuration
+
+```bash apps/api/.env
+# Generate a secure random string (use: openssl rand -base64 32)
+BETTER_AUTH_SECRET="your-super-secret-key-min-32-chars"
+
+# Base URL of your application
+BETTER_AUTH_URL="http://localhost:3000"
+
+# Application name
+APP_NAME="my-app"
+```
+
+<Warning>
+**Security Important:** Always generate a strong random secret for `BETTER_AUTH_SECRET`:
+```bash
+openssl rand -base64 32
+```
+Never commit your real secrets to version control!
+</Warning>
+
+#### Polar Payment Configuration (Optional)
+
+```bash apps/api/.env
+# Get these from https://polar.sh/settings
+POLAR_ACCESS_TOKEN="polar_oat_***"
+POLAR_WEBHOOK_SECRET="whsec_***"
+POLAR_SERVER="sandbox"  # or "production"
+POLAR_ORGANIZATION_ID="********-****-****-****-************"
+
+# Product IDs from Polar
+POLAR_BASIC_MONTHLY_PRODUCT_ID="********-****-****-****-************"
+POLAR_BASIC_YEARLY_PRODUCT_ID="********-****-****-****-************"
+POLAR_PRO_MONTHLY_PRODUCT_ID="********-****-****-****-************"
+POLAR_PRO_YEARLY_PRODUCT_ID="********-****-****-****-************"
+POLAR_ULTIMATE_MONTHLY_PRODUCT_ID="********-****-****-****-************"
+POLAR_ULTIMATE_YEARLY_PRODUCT_ID="********-****-****-****-************"
+
+# Checkout URLs
+POLAR_SUCCESS_URL="http://localhost:5173/checkout-success"
+POLAR_CANCEL_URL="http://localhost:5173/pricing"
+```
+
+#### Mercado Pago Configuration (Optional)
+
+```bash apps/api/.env
+# Get these from https://mercadopago.com/developers
+MERCADO_PAGO_ACCESS_TOKEN="APP_USR-***"
+MERCADO_PAGO_PUBLIC_KEY="APP_USR-***"
+MERCADO_PAGO_WEBHOOK_SECRET="your_webhook_secret_here"
+```
+
+#### Email Configuration (Optional)
+
+```bash apps/api/.env
+# Get API key from https://resend.com/
+RESEND_FROM_NAME="Your Name"
+RESEND_FROM_EMAIL="hello@yourdomain.com"
+RESEND_API_KEY="re_***"
+```
+
+#### Payment Provider Selection
+
+```bash apps/api/.env
+PAYMENT_PROVIDER="polar"  # or "mercadopago"
+```
+
+### UI Environment Variables
+
+Create `apps/ui/.env` from the example:
+
+```bash
+cp apps/ui/.env.example apps/ui/.env
+```
+
+Configure:
+
+```bash apps/ui/.env
+# API URL (should match your backend)
+VITE_API_URL="http://localhost:3000"
+
+# Payment provider
+VITE_PAYMENT_PROVIDER="polar"  # or "mercadopago"
+```
+
+### Docs Environment Variables
+
+Create `apps/docs/.env` if needed:
+
+```bash
+cp apps/docs/.env.example apps/docs/.env
+```
+
+## Database Setup
+
+After configuring your environment variables, set up the database:
+
+### Option 1: Push Schema (Development)
+
+Quickly push the schema to your database without migrations:
+
+```bash
+pnpm push
+```
+
+<Info>
+Use this during development for rapid iteration. Schema changes are applied directly without migration files.
+</Info>
+
+### Option 2: Generate Migrations (Production)
+
+Generate migration files for version control:
+
+```bash
+pnpm migrate
+```
+
+<Note>
+Migrations are stored in `apps/api/db/migrations/` and should be committed to version control.
+</Note>
+
+## Development Workflow
+
+### Start Development Servers
+
+Start all apps simultaneously:
+
+```bash
+pnpm dev
+```
+
+This starts:
+- **UI** on http://localhost:5173
+- **API** on http://localhost:3000
+- **Docs** on http://localhost:3001
+
+### Start Individual Apps
+
+<CodeGroup>
+```bash UI (Frontend)
+nx dev ui
+```
+
+```bash API (Backend)
+nx dev api
+```
+
+```bash Docs
+nx dev docs
+```
+</CodeGroup>
+
+### Build for Production
+
+```bash
+# Build all apps
+pnpm build
+
+# Build specific app
+nx build ui
+nx build api
+nx build docs
+```
+
+### Code Quality
+
+```bash
+# Format and auto-fix code
+pnpm dlx ultracite fix
+
+# Check for issues without fixing
+pnpm dlx ultracite check
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="pnpm: command not found">
+    Install pnpm globally:
+    ```bash
+    npm install -g pnpm@9
+    ```
+
+    Or use corepack (recommended):
+    ```bash
+    corepack enable
+    corepack prepare pnpm@9 --activate
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection error">
+    **Symptoms:** `Error: connect ECONNREFUSED` or `FATAL: password authentication failed`
+
+    **Solutions:**
+    1. Verify PostgreSQL is running:
+       ```bash
+       # macOS
+       brew services list | grep postgresql
+
+       # Linux
+       sudo systemctl status postgresql
+       ```
+
+    2. Check your `DATABASE_URL` format:
+       ```
+       postgresql://username:password@host:port/database
+       ```
+
+    3. Test the connection:
+       ```bash
+       psql "postgresql://username:password@host:port/database"
+       ```
+
+    4. Create the database if it doesn't exist:
+       ```sql
+       CREATE DATABASE myapp;
+       ```
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    **Error:** `EADDRINUSE: address already in use :::3000`
+
+    **Solutions:**
+    1. Find and kill the process using the port:
+       ```bash
+       # macOS/Linux
+       lsof -ti:3000 | xargs kill -9
+
+       # Windows
+       netstat -ano | findstr :3000
+       taskkill /PID <PID> /F
+       ```
+
+    2. Or change the port in config files:
+       - API: `apps/api/nitro.config.ts`
+       - UI: `apps/ui/vite.config.ts`
+  </Accordion>
+
+  <Accordion title="Module resolution errors">
+    **Error:** `Cannot find module '@beztack/...'`
+
+    **Solutions:**
+    1. Clean install dependencies:
+       ```bash
+       rm -rf node_modules
+       rm pnpm-lock.yaml
+       pnpm install
+       ```
+
+    2. Clear NX cache:
+       ```bash
+       npx nx reset
+       ```
+
+    3. Ensure you're using pnpm (not npm or yarn):
+       ```bash
+       pnpm install
+       ```
+  </Accordion>
+
+  <Accordion title="TypeScript errors after installation">
+    **Solutions:**
+    1. Build the workspace:
+       ```bash
+       pnpm build
+       ```
+
+    2. Restart your IDE/editor
+
+    3. Check TypeScript version:
+       ```bash
+       npx tsc --version  # Should be ~5.8.3
+       ```
+  </Accordion>
+
+  <Accordion title="Drizzle migrations fail">
+    **Error:** `Migration failed` or schema mismatch
+
+    **Solutions:**
+    1. Reset the database (development only!):
+       ```bash
+       pnpm push
+       ```
+
+    2. Check your `DATABASE_URL` is correct
+
+    3. Verify PostgreSQL version (14+ recommended):
+       ```bash
+       psql --version
+       ```
+  </Accordion>
+</AccordionGroup>
+
+### Getting Help
+
+If you encounter issues not covered here:
+
+1. Check the [GitHub Issues](https://github.com/V473r10/beztack/issues)
+2. Search existing documentation
+3. Open a new issue with:
+   - Error message
+   - Steps to reproduce
+   - Environment details (OS, Node version, pnpm version)
+
+## Post-Installation Steps
+
+<Steps>
+  <Step title="Verify installation">
+    Check that all services are running:
+    - UI: http://localhost:5173
+    - API: http://localhost:3000/api/_health
+    - Docs: http://localhost:3001
+  </Step>
+
+  <Step title="Create your first user">
+    Navigate to http://localhost:5173 and sign up for an account to test authentication.
+  </Step>
+
+  <Step title="Explore the codebase">
+    - `apps/ui/src` - Frontend React code
+    - `apps/api/server` - Backend API routes
+    - `apps/api/db/schema.ts` - Database schema
+    - `packages/` - Shared packages
+  </Step>
+
+  <Step title="Configure optional features">
+    Set up additional services based on your needs:
+    - Email templates in `packages/email`
+    - AI integration in `packages/ai`
+    - Payment webhooks in `apps/api/server/routes`
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="/concepts/architecture">
+    Learn about the monorepo organization and file structure
+  </Card>
+  <Card title="Authentication" icon="shield" href="/guides/authentication">
+    Set up user authentication, 2FA, and organizations
+  </Card>
+  <Card title="Database" icon="database" href="/guides/database">
+    Work with Drizzle ORM and manage migrations
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy your Beztack app to production
+  </Card>
+</CardGroup>
+
+## Development Tips
+
+<CardGroup cols={2}>
+  <Card title="NX Graph" icon="diagram-project">
+    Visualize project dependencies:
+    ```bash
+    npx nx graph
+    ```
+  </Card>
+  <Card title="Run Affected" icon="filter">
+    Build only changed projects:
+    ```bash
+    npx nx affected -t build
+    ```
+  </Card>
+  <Card title="Cache Management" icon="broom">
+    Clear NX cache:
+    ```bash
+    npx nx reset
+    ```
+  </Card>
+  <Card title="Database Studio" icon="table">
+    Explore your database:
+    ```bash
+    pnpm --filter @beztack/db studio
+    ```
+  </Card>
+</CardGroup>

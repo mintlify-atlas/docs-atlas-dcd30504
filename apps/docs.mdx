@@ -1,0 +1,439 @@
+---
+title: Documentation Site
+description: Next.js 16 documentation site powered by Fumadocs for beautiful, searchable MDX content
+---
+
+The documentation site is built with **Next.js 16** and **Fumadocs**, providing a modern, fast, and SEO-optimized documentation experience.
+
+## Architecture
+
+The docs app uses Next.js App Router with **Fumadocs MDX** for content management, automatic navigation generation, and built-in search.
+
+<CardGroup cols={2}>
+  <Card title="Framework" icon="react">
+    Next.js 16 with App Router and React Server Components
+  </Card>
+  <Card title="Content" icon="file-text">
+    Fumadocs MDX for type-safe, searchable documentation
+  </Card>
+  <Card title="Styling" icon="paintbrush">
+    Tailwind CSS v4 with Fumadocs UI components
+  </Card>
+  <Card title="Search" icon="search">
+    Built-in full-text search with fuzzy matching
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+### Core Dependencies
+
+```json
+{
+  "next": "16.0.7",
+  "react": "^19.2.1",
+  "fumadocs-core": "16.0.14",
+  "fumadocs-mdx": "14.0.2",
+  "fumadocs-ui": "16.0.14"
+}
+```
+
+### Key Features
+
+- **Fumadocs MDX** - File-based content management with frontmatter
+- **Type-Safe Content** - TypeScript types generated from MDX files
+- **Auto Navigation** - Sidebar navigation generated from file structure
+- **Full-Text Search** - Client-side search with fuzzy matching
+- **Syntax Highlighting** - Code blocks with language support
+- **Dark Mode** - Built-in theme switching
+- **SEO Optimized** - Meta tags, Open Graph, and sitemaps
+
+## How It Works
+
+### Content Structure
+
+Documentation pages are stored as MDX files in `content/docs/`:
+
+```
+content/docs/
+├── index.mdx              # Home page (/docs)
+├── getting-started/
+│   ├── index.mdx         # /docs/getting-started
+│   ├── installation.mdx  # /docs/getting-started/installation
+│   └── configuration.mdx # /docs/getting-started/configuration
+├── apps/
+│   ├── ui.mdx            # /docs/apps/ui
+│   ├── api.mdx           # /docs/apps/api
+│   └── docs.mdx          # /docs/apps/docs
+└── guides/
+    ├── authentication.mdx
+    └── deployment.mdx
+```
+
+### Fumadocs Source Loader
+
+The content is loaded via the source API:
+
+```typescript title="lib/source.ts"
+import { docs } from 'fumadocs-mdx:collections/server'
+import { loader } from 'fumadocs-core/source'
+import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons'
+
+export const source = loader({
+  baseUrl: '/docs',
+  source: docs.toFumadocsSource(),
+  plugins: [lucideIconsPlugin()],
+})
+```
+
+This provides:
+- Type-safe page queries
+- Automatic navigation tree
+- Search index generation
+- Frontmatter validation
+
+### Page Generation
+
+Docs pages are dynamically rendered:
+
+```typescript title="app/docs/[[...slug]]/page.tsx"
+import { source } from '@/lib/source'
+import { notFound } from 'next/navigation'
+
+export default async function DocsPage({
+  params,
+}: {
+  params: { slug?: string[] }
+}) {
+  const page = source.getPage(params.slug)
+  if (!page) notFound()
+
+  const MDX = page.data.body
+
+  return (
+    <article>
+      <h1>{page.data.title}</h1>
+      <p>{page.data.description}</p>
+      <MDX />
+    </article>
+  )
+}
+```
+
+### Frontmatter Schema
+
+Each MDX file includes frontmatter:
+
+```mdx title="content/docs/example.mdx"
+---
+title: Page Title
+description: Page description for SEO and preview cards
+icon: Rocket
+---
+
+Page content goes here...
+```
+
+## Running the Docs Locally
+
+### Development Server
+
+```bash
+# Start docs app only
+nx dev docs
+
+# Or start all apps
+pnpm dev
+```
+
+The docs site runs on **http://localhost:3002**.
+
+### File Watching
+
+Fumadocs automatically watches MDX files and regenerates types:
+
+```json title="package.json"
+{
+  "scripts": {
+    "dev": "next dev --port 3002",
+    "postinstall": "fumadocs-mdx"
+  }
+}
+```
+
+<Info>
+  MDX files are processed at build time, so changes require a page refresh in development.
+</Info>
+
+## Adding New Documentation Pages
+
+<Steps>
+  <Step title="Create MDX File">
+    Create a new `.mdx` file in `content/docs/`:
+    
+    ```mdx title="content/docs/guides/new-guide.mdx"
+    ---
+    title: New Guide
+    description: Learn how to use this feature
+    ---
+    
+    ## Introduction
+    
+    Your content here...
+    ```
+  </Step>
+  
+  <Step title="Add to Navigation (Optional)">
+    Navigation is auto-generated from file structure, but you can customize it in `source.config.ts` if needed.
+  </Step>
+  
+  <Step title="Regenerate Types">
+    Fumadocs will automatically regenerate types on file save:
+    
+    ```bash
+    pnpm fumadocs-mdx
+    ```
+  </Step>
+  
+  <Step title="View Your Page">
+    Navigate to the new page in your browser:
+    
+    ```
+    http://localhost:3002/docs/guides/new-guide
+    ```
+  </Step>
+</Steps>
+
+### Using Components in MDX
+
+Fumadocs provides built-in components:
+
+````mdx
+## Example Page
+
+<Card title="Quick Start" icon="rocket">
+  Get up and running in 5 minutes
+</Card>
+
+<Callout type="info">
+  This is an informational callout
+</Callout>
+
+<Steps>
+  <Step>First step</Step>
+  <Step>Second step</Step>
+  <Step>Third step</Step>
+</Steps>
+
+<Tabs items={['npm', 'pnpm', 'yarn']}>
+  <Tab value="npm">
+    ```bash
+    npm install package
+    ```
+  </Tab>
+  <Tab value="pnpm">
+    ```bash
+    pnpm add package
+    ```
+  </Tab>
+</Tabs>
+````
+
+### Code Blocks with Syntax Highlighting
+
+````mdx
+```typescript title="example.ts"
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
+const user: User = {
+  id: "1",
+  name: "John Doe",
+  email: "john@example.com",
+}
+```
+````
+
+Supported languages include: TypeScript, JavaScript, JSON, Bash, SQL, Python, and 100+ more.
+
+## Search Functionality
+
+Fumadocs includes built-in search:
+
+```typescript title="app/api/search/route.ts"
+import { source } from '@/lib/source'
+import { createSearchAPI } from 'fumadocs-core/search/server'
+
+export const { GET } = createSearchAPI('advanced', {
+  indexes: source.getPages().map((page) => ({
+    title: page.data.title,
+    description: page.data.description,
+    url: page.url,
+    structuredData: page.data.structuredData,
+  })),
+})
+```
+
+Search features:
+- **Fuzzy matching** - Typo-tolerant search
+- **Instant results** - Client-side search with no API calls
+- **Keyboard shortcuts** - `Cmd+K` or `Ctrl+K` to open
+- **Result highlighting** - Matched terms highlighted
+
+## Customization
+
+### Layout Configuration
+
+Customize the docs layout:
+
+```typescript title="lib/layout.shared.tsx"
+export const baseOptions: BaseLayoutProps = {
+  nav: {
+    title: 'Beztack Docs',
+  },
+  links: [
+    {
+      text: 'Documentation',
+      url: '/docs',
+      active: 'nested-url',
+    },
+  ],
+}
+```
+
+### Custom Components
+
+Add custom React components:
+
+```typescript title="components/custom-card.tsx"
+export function CustomCard({ title, children }) {
+  return (
+    <div className="rounded-lg border p-4">
+      <h3>{title}</h3>
+      {children}
+    </div>
+  )
+}
+```
+
+Then use in MDX:
+
+```mdx
+import { CustomCard } from '@/components/custom-card'
+
+<CustomCard title="Example">
+  Custom content here
+</CustomCard>
+```
+
+### Styling
+
+The docs use **Tailwind CSS v4**:
+
+```typescript title="tailwind.config.js"
+import { createPreset } from 'fumadocs-ui/tailwind-plugin'
+
+export default {
+  content: [
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './content/**/*.mdx',
+    './node_modules/fumadocs-ui/dist/**/*.js',
+  ],
+  presets: [createPreset()],
+}
+```
+
+## Deployment
+
+### Building for Production
+
+```bash
+# Build docs site
+nx build docs
+
+# Start production server
+nx start docs
+```
+
+### Vercel Deployment
+
+Next.js apps deploy seamlessly to Vercel:
+
+```json title="vercel.json"
+{
+  "buildCommand": "nx build docs",
+  "outputDirectory": "apps/docs/.next",
+  "framework": "nextjs"
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="Automatic Deployments" icon="rocket">
+    Push to main branch to trigger deployment
+  </Card>
+  <Card title="Preview Deployments" icon="eye">
+    Every PR gets a preview URL
+  </Card>
+  <Card title="Edge Network" icon="globe">
+    Deployed to Vercel's global CDN
+  </Card>
+  <Card title="Analytics" icon="chart-bar">
+    Built-in Web Vitals monitoring
+  </Card>
+</CardGroup>
+
+### Environment Variables
+
+No environment variables are required for basic docs deployment, but you can add:
+
+```bash title=".env.local"
+NEXT_PUBLIC_SITE_URL="https://docs.example.com"
+```
+
+## Advanced Features
+
+### OpenGraph Images
+
+Automatic OG image generation:
+
+```typescript title="app/og/docs/[...slug]/route.tsx"
+import { source } from '@/lib/source'
+import { ImageResponse } from 'next/og'
+
+export async function GET(req: Request) {
+  const page = source.getPage(params.slug)
+  
+  return new ImageResponse(
+    <div>
+      <h1>{page.data.title}</h1>
+    </div>
+  )
+}
+```
+
+### LLM-Friendly Output
+
+Export docs as plain text for LLM consumption:
+
+```typescript title="app/llms-full.txt/route.ts"
+import { source, getLLMText } from '@/lib/source'
+
+export async function GET() {
+  const pages = source.getPages()
+  const content = await Promise.all(
+    pages.map(page => getLLMText(page))
+  )
+  
+  return new Response(content.join('\n\n---\n\n'))
+}
+```
+
+Access at: `http://localhost:3002/llms-full.txt`
+
+<Tip>
+  Fumadocs provides excellent TypeScript support with auto-generated types for all your content.
+</Tip>

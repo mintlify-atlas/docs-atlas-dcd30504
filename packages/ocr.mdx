@@ -1,0 +1,317 @@
+---
+title: "@beztack/ocr"
+description: "Text extraction from images using Tesseract.js"
+---
+
+# OCR Package
+
+The `@beztack/ocr` package provides optical character recognition (OCR) capabilities using Tesseract.js, allowing you to extract text from images.
+
+## Installation
+
+The OCR package is optional. Add it during project creation:
+
+```bash Terminal
+pnpm dlx beztack init --modules ocr
+```
+
+Or install manually:
+
+```bash Terminal
+pnpm add @beztack/ocr --filter @beztack/api
+```
+
+## What's Included
+
+<CardGroup cols={2}>
+  <Card title="Tesseract.js" icon="scanner">
+    OCR engine running in JavaScript
+  </Card>
+  <Card title="Multi-language" icon="language">
+    Support for 100+ languages
+  </Card>
+  <Card title="Image Formats" icon="image">
+    PNG, JPEG, WebP, BMP, and more
+  </Card>
+  <Card title="Server & Client" icon="server">
+    Works in Node.js and browser environments
+  </Card>
+</CardGroup>
+
+## Exports
+
+```typescript
+import { extractTextFromImage } from "@beztack/ocr"
+```
+
+<ResponseField name="extractTextFromImage" type="function">
+  Extract text from an image file
+  
+  ```typescript
+  (imagePath: string, lang?: string) => Promise<string>
+  ```
+</ResponseField>
+
+## API Reference
+
+### `extractTextFromImage()`
+
+```typescript Function Signature
+function extractTextFromImage(
+  imagePath: string,
+  lang?: string
+): Promise<string>
+```
+
+**Parameters:**
+
+<ParamField path="imagePath" type="string" required>
+  Path to image file (local file system or URL)
+  
+  **Supported formats:** PNG, JPEG, WebP, BMP, TIFF
+</ParamField>
+
+<ParamField path="lang" type="string" default="eng">
+  Tesseract language code
+  
+  **Common values:**
+  - `eng` - English
+  - `spa` - Spanish
+  - `fra` - French
+  - `deu` - German
+  - `chi_sim` - Simplified Chinese
+  - `ara` - Arabic
+  
+  **Multi-language:** Use `+` separator (e.g., `eng+spa`)
+</ParamField>
+
+**Returns:**
+
+<ResponseField name="text" type="string">
+  Extracted text from the image
+</ResponseField>
+
+## Usage Examples
+
+### Basic Text Extraction
+
+```typescript Example
+import { extractTextFromImage } from "@beztack/ocr"
+
+const text = await extractTextFromImage("/path/to/document.png")
+console.log(text)
+// Output: "This is the text from the image"
+```
+
+### Multi-language OCR
+
+```typescript Spanish + English
+import { extractTextFromImage } from "@beztack/ocr"
+
+const text = await extractTextFromImage(
+  "/path/to/bilingual.jpg",
+  "eng+spa"
+)
+console.log(text)
+```
+
+### API Route Handler
+
+```typescript Nitro Route
+import { extractTextFromImage } from "@beztack/ocr"
+import { defineEventHandler, readMultipartFormData, createError } from "h3"
+import { writeFile } from "node:fs/promises"
+import { join } from "node:path"
+
+export default defineEventHandler(async (event) => {
+  const formData = await readMultipartFormData(event)
+  const imageFile = formData?.find((field) => field.name === "image")
+
+  if (!imageFile) {
+    throw createError({ statusCode: 400, message: "No image provided" })
+  }
+
+  // Save uploaded file temporarily
+  const tempPath = join("/tmp", `ocr-${Date.now()}.png`)
+  await writeFile(tempPath, imageFile.data)
+
+  try {
+    const text = await extractTextFromImage(tempPath, "eng")
+    return { text }
+  } catch (error) {
+    throw createError({
+      statusCode: 500,
+      message: "OCR processing failed",
+    })
+  }
+})
+```
+
+### Processing Remote Images
+
+```typescript URL Input
+import { extractTextFromImage } from "@beztack/ocr"
+
+const imageUrl = "https://example.com/receipt.jpg"
+const text = await extractTextFromImage(imageUrl, "eng")
+console.log(text)
+```
+
+### Document Processing
+
+```typescript Invoice OCR
+import { extractTextFromImage } from "@beztack/ocr"
+import { db, document } from "@beztack/db"
+
+async function processInvoice(imagePath: string) {
+  // Extract text
+  const rawText = await extractTextFromImage(imagePath, "eng")
+
+  // Parse extracted text (simplified example)
+  const invoiceNumber = rawText.match(/Invoice #: (\d+)/)?.[1]
+  const totalAmount = rawText.match(/Total: \$(\d+\.\d{2})/)?.[1]
+
+  // Save to database
+  await db.insert(document).values({
+    id: crypto.randomUUID(),
+    type: "invoice",
+    content: rawText,
+    metadata: JSON.stringify({
+      invoiceNumber,
+      totalAmount: totalAmount ? Number.parseFloat(totalAmount) : null,
+    }),
+  })
+
+  return { invoiceNumber, totalAmount }
+}
+```
+
+## Supported Languages
+
+Tesseract.js supports over 100 languages. Common language codes:
+
+<CardGroup cols={3}>
+  <Card title="English" icon="a">eng</Card>
+  <Card title="Spanish" icon="a">spa</Card>
+  <Card title="French" icon="a">fra</Card>
+  <Card title="German" icon="a">deu</Card>
+  <Card title="Italian" icon="a">ita</Card>
+  <Card title="Portuguese" icon="a">por</Card>
+  <Card title="Russian" icon="a">rus</Card>
+  <Card title="Japanese" icon="a">jpn</Card>
+  <Card title="Korean" icon="a">kor</Card>
+  <Card title="Chinese (Simplified)" icon="a">chi_sim</Card>
+  <Card title="Chinese (Traditional)" icon="a">chi_tra</Card>
+  <Card title="Arabic" icon="a">ara</Card>
+</CardGroup>
+
+<Tip>
+  See the [full language list](https://github.com/tesseract-ocr/tessdata) for all supported languages.
+</Tip>
+
+## Performance Tips
+
+### Image Preprocessing
+
+For better accuracy, preprocess images before OCR:
+
+```typescript Image Optimization
+import sharp from "sharp"
+import { extractTextFromImage } from "@beztack/ocr"
+
+async function ocrWithPreprocessing(inputPath: string) {
+  const processedPath = "/tmp/processed.png"
+
+  // Enhance image for better OCR
+  await sharp(inputPath)
+    .grayscale() // Convert to grayscale
+    .normalize() // Improve contrast
+    .sharpen() // Enhance edges
+    .toFile(processedPath)
+
+  return extractTextFromImage(processedPath)
+}
+```
+
+### Worker Reuse
+
+<Note>
+  The current implementation creates and terminates a worker for each request. For high-volume processing, consider creating a worker pool.
+</Note>
+
+## Error Handling
+
+```typescript Try-Catch
+import { extractTextFromImage } from "@beztack/ocr"
+import { defineEventHandler, createError } from "h3"
+
+export default defineEventHandler(async (event) => {
+  try {
+    const text = await extractTextFromImage("/path/to/image.png", "eng")
+    return { success: true, text }
+  } catch (error) {
+    console.error("OCR failed:", error)
+    throw createError({
+      statusCode: 500,
+      message: error instanceof Error ? error.message : "OCR processing failed",
+    })
+  }
+})
+```
+
+## Source Code
+
+```typescript packages/ocr/index.ts:1-12
+import { createWorker } from "tesseract.js"
+
+export const extractTextFromImage = async (
+  imagePath: string,
+  lang?: string
+) => {
+  const worker = await createWorker(lang)
+  const ret = await worker.recognize(imagePath)
+  await worker.terminate()
+  return ret.data.text
+}
+```
+
+## Dependencies
+
+- `tesseract.js` ^6.0.1 - OCR engine
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Invoice Processing" icon="file-invoice">
+    Extract data from scanned invoices and receipts
+  </Card>
+  <Card title="Document Digitization" icon="file-lines">
+    Convert paper documents to searchable text
+  </Card>
+  <Card title="ID Verification" icon="id-card">
+    Extract information from ID cards and passports
+  </Card>
+  <Card title="Business Card Scanner" icon="address-card">
+    Parse contact information from business cards
+  </Card>
+  <Card title="License Plates" icon="car">
+    Read vehicle registration numbers
+  </Card>
+  <Card title="Accessibility" icon="universal-access">
+    Convert images to text for screen readers
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Tesseract.js Docs" icon="book" href="https://tesseract.projectnaptha.com/">
+    Official Tesseract.js documentation
+  </Card>
+  <Card title="Language Data" icon="language" href="https://github.com/tesseract-ocr/tessdata">
+    Trained language data files
+  </Card>
+  <Card title="Apps Documentation" icon="window" href="/apps/ui">
+    Using OCR in your Beztack app
+  </Card>
+</CardGroup>

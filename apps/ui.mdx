@@ -1,0 +1,340 @@
+---
+title: UI App
+description: Frontend SPA built with Vite, React 19, and modern tooling for a fast, type-safe user experience
+---
+
+The UI app is a modern single-page application (SPA) built with **Vite** and **React 19**, providing a lightning-fast development experience and production-ready build.
+
+## Architecture
+
+The frontend is built as a client-side SPA with file-based routing using **React Router** v7. It leverages modern React patterns including hooks, context, and server state management with TanStack Query.
+
+<CardGroup cols={2}>
+  <Card title="Build Tool" icon="bolt">
+    Vite with React SWC plugin for instant HMR and optimized builds
+  </Card>
+  <Card title="UI Components" icon="palette">
+    shadcn/ui components built on Radix UI primitives with Tailwind CSS v4
+  </Card>
+  <Card title="Routing" icon="route">
+    React Router v7 for client-side navigation with protected routes
+  </Card>
+  <Card title="State Management" icon="database">
+    TanStack Query for server state, nuqs for URL state
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+### Core Dependencies
+
+```json
+{
+  "react": "^19.2.1",
+  "react-dom": "^19.2.1",
+  "react-router": "^7.10.1",
+  "vite": "^6.4.1",
+  "@vitejs/plugin-react-swc": "^3.11.0"
+}
+```
+
+### UI & Styling
+
+- **Tailwind CSS v4** - Utility-first CSS with Vite plugin
+- **shadcn/ui** - Customizable component library built on Radix UI
+- **Radix UI** - Accessible, unstyled component primitives
+- **@tabler/icons-react** & **lucide-react** - Icon libraries
+- **next-themes** - Theme management (light/dark mode)
+- **motion** - Animation library (formerly Framer Motion)
+
+### Data & Forms
+
+- **@tanstack/react-query** - Server state management with caching
+- **@tanstack/react-form** - Type-safe form handling
+- **react-hook-form** - Form validation and state
+- **zod** - Runtime type validation
+- **@hookform/resolvers** - Form validation resolvers
+
+### Authentication & Payments
+
+- **better-auth** - Authentication client
+- **@polar-sh/better-auth** - Polar payments integration
+- **@beztack/mercadopago** - MercadoPago payment provider
+
+### Workspace Packages
+
+```typescript
+"@beztack/ai"          // AI SDK integration
+"@beztack/env"         // Environment validation
+"@beztack/mercadopago" // Payment processing
+"@beztack/ocr"         // OCR utilities
+"@beztack/state"       // URL state management
+```
+
+## Directory Structure
+
+```
+apps/ui/src/
+├── app/                    # Application pages
+│   ├── admin/             # Admin dashboard & analytics
+│   ├── auth/              # Authentication (sign-in, sign-up, 2FA)
+│   ├── billing/           # Subscription & payment pages
+│   ├── home/              # Landing/home page
+│   ├── ocr/               # OCR demo page
+│   ├── organizations/     # Organization management
+│   └── settings/          # User settings
+├── components/            # Shared React components
+│   ├── ui/               # shadcn/ui components
+│   ├── organizations/    # Org-specific components
+│   └── payments/         # Payment components
+├── contexts/             # React contexts (theme, membership)
+├── features/             # Feature-specific modules
+│   ├── ai/              # AI integration
+│   ├── auth/            # Auth utilities
+│   ├── ocr/             # OCR features
+│   └── payments/        # Payment flows
+├── hooks/               # Custom React hooks
+├── lib/                 # Utilities and helpers
+│   └── i18n/           # Internationalization setup
+├── types/              # TypeScript type definitions
+├── app.tsx             # Main app component with routing
+├── main.tsx            # Application entry point
+└── index.css           # Global styles
+```
+
+## Key Features
+
+### Authentication UI
+
+Built-in authentication pages with Better Auth integration:
+
+<Steps>
+  <Step title="Sign In & Sign Up">
+    Email/password authentication with form validation and error handling
+  </Step>
+  <Step title="Two-Factor Authentication">
+    TOTP-based 2FA with QR code enrollment and verification
+  </Step>
+  <Step title="Protected Routes">
+    Route guards for authenticated and admin-only pages
+  </Step>
+</Steps>
+
+```typescript title="apps/ui/src/app.tsx"
+<Route
+  element={
+    <ProtectedRoute>
+      <MainLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route element={<Home />} index />
+  <Route element={<Settings />} path="settings" />
+</Route>
+
+<Route
+  element={
+    <AdminRoute>
+      <MainLayout />
+    </AdminRoute>
+  }
+  path="admin"
+>
+  <Route element={<AdminDashboard />} index />
+  <Route element={<UsersPage />} path="users" />
+</Route>
+```
+
+### Admin Dashboard
+
+Comprehensive admin interface with:
+
+- **User Management** - View, edit, and manage user accounts
+- **Analytics** - Real-time metrics and charts (requires Pro membership)
+- **Plan Sync** - Synchronize subscription plans with payment providers
+- **Charts** - Animated visualizations with Recharts
+
+### Billing & Subscriptions
+
+Multi-provider payment integration:
+
+- **Polar** - Primary payment provider with checkout and customer portal
+- **MercadoPago** - Alternative payment provider for Latin America
+- **Subscription Management** - View, upgrade, and cancel subscriptions
+- **Pricing Page** - Dynamic pricing with plan comparison
+
+### Component Library
+
+Built on **shadcn/ui** with fully accessible components:
+
+```typescript
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+
+function Example() {
+  return (
+    <Card>
+      <CardHeader>User Profile</CardHeader>
+      <CardContent>
+        <Input placeholder="Enter name" />
+        <Button type="button">Save</Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+Available components include: Button, Input, Select, Dialog, Dropdown, Tabs, Table, Toast, and 40+ more.
+
+## Development
+
+### Running the Dev Server
+
+```bash
+# Start UI app only
+nx dev ui
+
+# Or start all apps
+pnpm dev
+```
+
+The dev server runs on **http://localhost:5173** with hot module replacement (HMR).
+
+### Environment Variables
+
+Create `.env` file in the project root:
+
+```bash title=".env"
+VITE_API_URL="http://localhost:3001"
+VITE_PAYMENT_PROVIDER="polar"  # or "mercadopago"
+VITE_MERCADO_PAGO_PUBLIC_KEY="your-public-key"
+```
+
+<Note>
+  Environment variables must be prefixed with `VITE_` to be exposed to the client.
+</Note>
+
+### Building for Production
+
+```bash
+# Build UI app
+nx build ui
+
+# Preview production build
+nx preview ui
+```
+
+The build output is in `apps/ui/dist/` and can be deployed to any static hosting service.
+
+## Styling Approach
+
+### Tailwind CSS v4
+
+The app uses **Tailwind CSS v4** with the Vite plugin for optimal performance:
+
+```typescript title="apps/ui/vite.config.ts"
+import tailwindcss from "@tailwindcss/vite"
+
+export default defineConfig({
+  plugins: [
+    react(),
+    tailwindcss(),
+  ],
+})
+```
+
+### Theme System
+
+Dark mode is handled via **next-themes** with CSS variables:
+
+```typescript
+import { ThemeProvider } from "./contexts/theme-context"
+
+function App() {
+  return (
+    <ThemeProvider>
+      {/* Your app */}
+    </ThemeProvider>
+  )
+}
+```
+
+### Component Customization
+
+shadcn/ui components are stored in `src/components/ui/` and can be customized:
+
+```bash
+# Add new components
+npx shadcn@latest add button
+npx shadcn@latest add dialog
+```
+
+## State Management
+
+### Server State (TanStack Query)
+
+```typescript
+import { useQuery } from "@tanstack/react-query"
+
+function UserProfile() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["user"],
+    queryFn: () => fetch("/api/user").then(r => r.json()),
+    staleTime: 60_000, // 1 minute
+  })
+
+  if (isLoading) return <div>Loading...</div>
+  return <div>{data.name}</div>
+}
+```
+
+### URL State (nuqs)
+
+```typescript
+import { useQueryState } from "@beztack/state"
+
+function SearchPage() {
+  const [search, setSearch] = useQueryState("q")
+  
+  return (
+    <input
+      value={search ?? ""}
+      onChange={e => setSearch(e.target.value)}
+    />
+  )
+}
+```
+
+## Deployment
+
+The UI app can be deployed to:
+
+<CardGroup cols={2}>
+  <Card title="Vercel" icon="triangle">
+    Automatic deployments with zero configuration
+  </Card>
+  <Card title="Netlify" icon="wave">
+    Deploy with drag-and-drop or Git integration
+  </Card>
+  <Card title="Cloudflare Pages" icon="cloud">
+    Edge deployment with global CDN
+  </Card>
+  <Card title="Static Hosting" icon="server">
+    Any static host (AWS S3, DigitalOcean, etc.)
+  </Card>
+</CardGroup>
+
+### Vercel Deployment
+
+```json title="vercel.json"
+{
+  "buildCommand": "nx build ui",
+  "outputDirectory": "apps/ui/dist",
+  "framework": "vite"
+}
+```
+
+<Warning>
+  Remember to set environment variables in your hosting provider's dashboard.
+</Warning>

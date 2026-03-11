@@ -1,0 +1,421 @@
+---
+title: "Monorepo with NX"
+description: "How Beztack uses NX for efficient task orchestration, caching, and workspace management"
+---
+
+Beztack is built as an NX monorepo with pnpm workspaces. This combination provides enterprise-grade tooling with minimal configuration overhead.
+
+## Why NX?
+
+NX was chosen for Beztack because it solves critical challenges in monorepo development:
+
+<CardGroup cols={2}>
+  <Card title="Intelligent Caching" icon="bolt">
+    NX caches task outputs locally and remotely, dramatically speeding up repeated builds and tests.
+  </Card>
+  <Card title="Affected Detection" icon="code-branch">
+    Only run tasks on projects affected by code changes, saving time in CI/CD.
+  </Card>
+  <Card title="Task Orchestration" icon="diagram-project">
+    Automatically runs tasks in dependency order with maximum parallelization.
+  </Card>
+  <Card title="Project Graph" icon="sitemap">
+    Visualize dependencies between apps and packages with `nx graph`.
+  </Card>
+</CardGroup>
+
+## Workspace Structure
+
+Beztack follows NX conventions for workspace organization:
+
+```
+beztack/
+├── apps/                    # Deployable applications
+│   ├── ui/                  # Frontend SPA
+│   ├── api/                 # Backend server
+│   └── docs/                # Documentation site
+├── packages/                # Shared libraries
+│   ├── ai/
+│   ├── cli/
+│   ├── db/
+│   ├── email/
+│   ├── env/
+│   ├── ocr/
+│   └── state/
+├── nx.json                  # NX configuration
+├── pnpm-workspace.yaml      # pnpm workspace config
+└── package.json             # Root package with scripts
+```
+
+### Naming Conventions
+
+- **Apps:** Placed in `apps/` directory, named by purpose (`ui`, `api`, `docs`)
+- **Packages:** Placed in `packages/` directory, scoped as `@beztack/*`
+- **Tasks:** Standard targets like `dev`, `build`, `test`, `lint`, `typecheck`
+
+## NX Configuration
+
+Beztack's NX setup is minimal and powerful. Here's the complete `nx.json`:
+
+```json
+{
+	"$schema": "./node_modules/nx/schemas/nx-schema.json",
+	"namedInputs": {
+		"default": ["{projectRoot}/**/*", "sharedGlobals"],
+		"production": ["default"],
+		"sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
+	},
+	"nxCloudId": "68b65b3d5e52195fddab755b",
+	"plugins": [
+		{
+			"plugin": "@nx/js/typescript",
+			"options": {
+				"typecheck": {
+					"targetName": "typecheck"
+				},
+				"build": {
+					"targetName": "build",
+					"configName": "tsconfig.lib.json",
+					"buildDepsName": "build-deps",
+					"watchDepsName": "watch-deps"
+				}
+			}
+		}
+	]
+}
+```
+
+### Key Configuration Elements
+
+**Named Inputs:**
+- `default`: All files in project root plus shared globals
+- `production`: Same as default (can be customized to exclude test files)
+- `sharedGlobals`: Files that affect all projects (CI config)
+
+**Plugins:**
+- `@nx/js/typescript`: Auto-infers TypeScript build and typecheck targets from `tsconfig.json`
+
+**NX Cloud:**
+- Connected via `nxCloudId` for remote caching and distributed task execution
+
+<Info>
+NX uses **inferred tasks** from the TypeScript plugin, meaning you don't need to manually configure `project.json` files for every package.
+</Info>
+
+## Task Orchestration
+
+### Running Tasks
+
+NX provides powerful commands for running tasks across the monorepo:
+
+```bash
+# Run a task for a specific project
+nx dev ui                    # Start UI in dev mode
+nx build api                 # Build API
+nx test db                   # Run tests for db package
+
+# Run a task for all projects
+nx run-many -t build         # Build all projects
+nx run-many -t test          # Test all projects
+nx run-many -t lint          # Lint all projects
+
+# Run multiple tasks in parallel
+nx run-many -t build test    # Build and test everything
+
+# Run tasks for affected projects only
+nx affected -t build         # Build only changed projects
+nx affected -t test          # Test only affected projects
+```
+
+### Parallel Execution
+
+NX automatically parallelizes tasks when safe to do so:
+
+```bash
+# Run dev servers with custom parallelization
+pnpm dev                     # Runs: nx run-many -t dev --parallel=10
+
+# Control parallelization
+nx run-many -t build --parallel=3
+nx run-many -t test --parallel=false  # Sequential
+```
+
+<Note>
+NX respects **dependency order**: If `apps/ui` depends on `packages/env`, NX will build `env` before `ui`.
+</Note>
+
+## Workspace Scripts
+
+Beztack's root `package.json` defines convenient scripts:
+
+```json
+{
+	"scripts": {
+		"build": "nx run-many -t build",
+		"start": "nx run-many -t start",
+		"dev": "nx run-many -t dev --parallel=10",
+		"lint": "nx lint",
+		"test": "nx test",
+		"migrate": "pnpm --filter @beztack/db migrate",
+		"push": "pnpm --filter @beztack/db push"
+	}
+}
+```
+
+### Script Breakdown
+
+- **`pnpm dev`**: Start all apps in development mode with 10 parallel processes
+- **`pnpm build`**: Build all apps and packages in dependency order
+- **`pnpm test`**: Run tests across the entire workspace
+- **`pnpm migrate`**: Run database migrations (scoped to `@beztack/db`)
+- **`pnpm push`**: Push Drizzle schema changes to database
+
+## Cache Optimization
+
+NX's caching system is a game-changer for build performance:
+
+### Local Cache
+
+NX caches task outputs in `.nx/cache/`:
+
+```bash
+# First build (no cache)
+nx build ui
+# ✓ Build completed in 12.3s
+
+# Second build (cached)
+nx build ui
+# ✓ Build completed in 0.1s (cache hit)
+```
+
+### Remote Cache (NX Cloud)
+
+With NX Cloud configured, cache is shared across:
+- All developers on your team
+- CI/CD pipeline runs
+- Different machines
+
+<Tip>
+After another developer runs `nx build`, you get instant cache hits without building locally.
+</Tip>
+
+### Cache Invalidation
+
+NX automatically invalidates cache when:
+- Source files change
+- Dependencies change
+- Task configuration changes
+- Environment variables change (if specified in inputs)
+
+## Affected Detection
+
+NX's "affected" commands are crucial for efficient CI/CD:
+
+```bash
+# In CI: only build/test what changed
+nx affected -t build test --base=origin/main
+
+# See what's affected
+nx affected:graph --base=origin/main
+
+# Print affected projects
+nx print-affected --base=origin/main --select=projects
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Git Diff">
+    NX analyzes git diff to find changed files since base branch.
+  </Step>
+  
+  <Step title="Dependency Graph">
+    NX builds a dependency graph of all projects in the workspace.
+  </Step>
+  
+  <Step title="Impact Analysis">
+    NX determines which projects are affected by the changes.
+  </Step>
+  
+  <Step title="Task Execution">
+    Only affected projects have their tasks executed.
+  </Step>
+</Steps>
+
+### Example Scenario
+
+```bash
+# You change packages/email/src/templates/welcome.tsx
+nx affected:graph --base=main
+```
+
+**Affected projects:**
+- `@beztack/email` (direct change)
+- `api` (depends on `@beztack/email`)
+- `ui` is NOT affected
+- `docs` is NOT affected
+
+## Project Graph Visualization
+
+NX provides a powerful graph visualization:
+
+```bash
+nx graph
+```
+
+This opens an interactive browser view showing:
+- All apps and packages
+- Dependencies between projects
+- Task dependencies
+- Affected projects (when using `--affected`)
+
+<Tip>
+Use `nx graph --file=graph.html` to export the graph for documentation.
+</Tip>
+
+## Adding New Apps or Packages
+
+Beztack makes it easy to extend the monorepo:
+
+### Adding a New Package
+
+<Steps>
+  <Step title="Create Directory">
+    Create `packages/my-package/` with standard structure.
+  </Step>
+  
+  <Step title="Add package.json">
+    ```json
+    {
+      "name": "@beztack/my-package",
+      "version": "0.0.1",
+      "type": "module",
+      "main": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+    ```
+  </Step>
+  
+  <Step title="Add tsconfig.json">
+    ```json
+    {
+      "extends": "../../tsconfig.base.json",
+      "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./src"
+      },
+      "include": ["src/**/*"]
+    }
+    ```
+  </Step>
+  
+  <Step title="Install">
+    ```bash
+    pnpm install
+    ```
+    NX will automatically detect the new package.
+  </Step>
+</Steps>
+
+### Adding a New App
+
+```bash
+# Create app directory
+mkdir -p apps/my-app
+
+# Add package.json with name and scripts
+# Add necessary config files (tsconfig, vite.config, etc.)
+
+# Install dependencies
+pnpm install
+
+# NX auto-detects the new app
+nx show project my-app
+```
+
+<Note>
+NX's TypeScript plugin automatically infers tasks from `package.json` scripts and `tsconfig.json`, so you typically don't need `project.json`.
+</Note>
+
+## pnpm Workspace Integration
+
+Beztack uses pnpm workspaces alongside NX:
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "packages/**/*"
+  - "scripts/*"
+
+autoInstallPeers: true
+strictPeerDependencies: false
+```
+
+### Installing Dependencies
+
+```bash
+# Add dependency to specific project
+pnpm add react --filter @beztack/ui
+pnpm add drizzle-orm --filter @beztack/db
+
+# Add dev dependency to root
+pnpm add -D typescript -w
+
+# Add workspace dependency
+# In apps/ui/package.json:
+{
+	"dependencies": {
+		"@beztack/env": "workspace:*"
+	}
+}
+```
+
+<Warning>
+Always use `--filter` flag when adding dependencies to specific projects. Installing at root without `-w` flag will fail.
+</Warning>
+
+## CI/CD Integration
+
+Beztack's monorepo structure optimizes CI/CD:
+
+```yaml
+# .github/workflows/ci.yml (example)
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # For affected detection
+      
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      
+      - run: pnpm install --frozen-lockfile
+      
+      # Only build/test affected projects
+      - run: npx nx affected -t build test lint --base=origin/main
+```
+
+<Tip>
+Use `nx affected` in CI to dramatically reduce build times when only a few files changed.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn about Beztack's three-app architecture
+  </Card>
+  <Card title="Module System" icon="puzzle-piece" href="/concepts/modules">
+    Understand how to customize your Beztack project
+  </Card>
+</CardGroup>

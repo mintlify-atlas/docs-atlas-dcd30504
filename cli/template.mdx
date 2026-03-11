@@ -1,0 +1,500 @@
+---
+title: beztack template
+description: Manage template synchronization and updates for your Beztack project
+---
+
+The `beztack template` command provides tools for synchronizing your project with upstream template changes. This allows you to receive updates, bug fixes, and new features from the Beztack template while preserving your customizations.
+
+## Usage
+
+```bash
+beztack template <subcommand> [options]
+```
+
+## Subcommands
+
+<CardGroup cols={2}>
+  <Card title="status" icon="chart-line">
+    Check the current template version and available updates
+  </Card>
+  <Card title="plan" icon="list-check">
+    Generate an update plan showing what will change
+  </Card>
+  <Card title="apply" icon="play">
+    Apply the update plan to your project
+  </Card>
+  <Card title="inspect" icon="magnifying-glass">
+    Launch an interactive web viewer for changes
+  </Card>
+</CardGroup>
+
+## Subcommand: status
+
+Check the template synchronization status for your project.
+
+```bash
+beztack template status
+```
+
+**Output**:
+```
+Template status
+- Template ID: beztack
+- Current version: 0.0.10
+- Target version: 0.0.12
+- Pending changes: 24
+- Skipped unchanged template files: 156
+- Conflicts: 2
+- Report: /path/to/project/.beztack/beztack-sync-report.md
+```
+
+### Options
+
+<ParamField path="--refresh" type="flag">
+  Force refresh the template cache before checking status.
+  
+  ```bash
+  beztack template status --refresh
+  ```
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only the local template cache, without fetching updates.
+  
+  ```bash
+  beztack template status --offline
+  ```
+</ParamField>
+
+<ParamField path="--template-root" type="string">
+  Specify a custom template root directory (local path or Git URL).
+  
+  ```bash
+  beztack template status --template-root ../beztack
+  ```
+</ParamField>
+
+## Subcommand: plan
+
+Generate a detailed update plan without making any changes.
+
+```bash
+beztack template plan
+```
+
+**Output**:
+```
+Template update plan
+- From: 0.0.10
+- To: 0.0.12
+- Changes: 24
+- Skipped unchanged template files: 156
+- Conflicts: 2
+- Report: /path/to/project/.beztack/beztack-sync-report.md
+```
+
+The report file contains a detailed breakdown of:
+- Files to be added
+- Files to be modified
+- Files to be deleted
+- Conflicts requiring manual resolution
+- Side-by-side diffs for modified files
+
+### Options
+
+<ParamField path="--to" type="string">
+  Specify the target template version to plan for.
+  
+  ```bash
+  beztack template plan --to 1.2.0
+  ```
+  
+  If not specified, uses the latest version from the template repository.
+</ParamField>
+
+<ParamField path="--template-root" type="string">
+  Specify a custom template root directory.
+  
+  ```bash
+  beztack template plan --template-root ../beztack
+  ```
+</ParamField>
+
+<ParamField path="--refresh" type="flag">
+  Force refresh the template cache before generating the plan.
+  
+  ```bash
+  beztack template plan --refresh
+  ```
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only the local template cache.
+  
+  ```bash
+  beztack template plan --offline
+  ```
+</ParamField>
+
+## Subcommand: apply
+
+Apply the update plan to your project. This command modifies your project files.
+
+```bash
+beztack template apply
+```
+
+**Output**:
+```
+Template apply finished
+- Dry run: no
+- Snapshot: 20260311-143022-abc123
+- Applied: 22
+- Skipped: 0
+- Skipped unchanged template files: 156
+- Conflicts: 2
+- Report: /path/to/project/.beztack/beztack-sync-report.md
+```
+
+<Warning>
+  Always review the plan (via `beztack template plan` or `beztack template inspect`) before applying changes. Conflicts must be resolved manually.
+</Warning>
+
+### Options
+
+<ParamField path="--dry-run" type="flag">
+  Preview the apply operation without making any actual changes.
+  
+  ```bash
+  beztack template apply --dry-run
+  ```
+  
+  This is useful for testing the update process before committing to changes.
+</ParamField>
+
+<ParamField path="--to" type="string">
+  Specify the target template version to apply.
+  
+  ```bash
+  beztack template apply --to 1.2.0
+  ```
+</ParamField>
+
+<ParamField path="--template-root" type="string">
+  Specify a custom template root directory.
+  
+  ```bash
+  beztack template apply --template-root ../beztack
+  ```
+</ParamField>
+
+<ParamField path="--refresh" type="flag">
+  Force refresh the template cache before applying changes.
+  
+  ```bash
+  beztack template apply --refresh
+  ```
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only the local template cache.
+  
+  ```bash
+  beztack template apply --offline
+  ```
+</ParamField>
+
+### Snapshots and Rollback
+
+When you run `apply`, Beztack automatically creates a snapshot of your project. If the apply fails, it automatically rolls back to the snapshot.
+
+You can also manually rollback using:
+
+```bash
+beztack template rollback
+```
+
+This restores your project to the state before the last `apply` operation.
+
+## Subcommand: inspect
+
+Launch an interactive web-based viewer to inspect template changes visually.
+
+```bash
+beztack template inspect
+```
+
+**Output**:
+```
+Template inspect viewer
+- URL: http://127.0.0.1:3434
+- Changes: 24
+- Skipped unchanged template files: 156
+- Conflicts: 2
+- Report: /path/to/project/.beztack/beztack-sync-report.md
+- Press Ctrl+C to stop the viewer
+```
+
+The web viewer provides:
+- Searchable list of all changes
+- Side-by-side diffs for each file
+- Conflict highlighting
+- Change type indicators (add, modify, delete)
+- File ownership information (template-owned, custom-owned, mixed)
+
+### Options
+
+<ParamField path="--host" type="string" default="127.0.0.1">
+  Host address for the development server.
+  
+  ```bash
+  beztack template inspect --host 0.0.0.0
+  ```
+</ParamField>
+
+<ParamField path="--port" type="number" default="3434">
+  Port number for the development server.
+  
+  ```bash
+  beztack template inspect --port 3000
+  ```
+  
+  If the port is in use, Beztack automatically finds an available port.
+</ParamField>
+
+<ParamField path="--template-root" type="string">
+  Specify a custom template root directory.
+  
+  ```bash
+  beztack template inspect --template-root ../beztack
+  ```
+</ParamField>
+
+<ParamField path="--refresh" type="flag">
+  Force refresh the template cache before launching the viewer.
+  
+  ```bash
+  beztack template inspect --refresh
+  ```
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only the local template cache.
+  
+  ```bash
+  beztack template inspect --offline
+  ```
+</ParamField>
+
+## Template Synchronization Workflow
+
+The recommended workflow for updating your project:
+
+<Steps>
+  <Step title="Check Status">
+    ```bash
+    beztack template status
+    ```
+    
+    Review the number of pending changes and conflicts.
+  </Step>
+  
+  <Step title="Inspect Changes">
+    ```bash
+    beztack template inspect
+    ```
+    
+    Launch the web viewer to visually review all changes. Look for:
+    - Files you've customized (potential conflicts)
+    - Breaking changes in core functionality
+    - New features you want to adopt
+  </Step>
+  
+  <Step title="Generate Plan">
+    ```bash
+    beztack template plan
+    ```
+    
+    Generate a detailed markdown report at `.beztack/beztack-sync-report.md`.
+  </Step>
+  
+  <Step title="Dry Run Apply">
+    ```bash
+    beztack template apply --dry-run
+    ```
+    
+    Test the apply operation without making changes.
+  </Step>
+  
+  <Step title="Apply Updates">
+    ```bash
+    beztack template apply
+    ```
+    
+    Apply the changes to your project. A snapshot is created automatically.
+  </Step>
+  
+  <Step title="Resolve Conflicts">
+    If there are conflicts, manually edit the affected files. The sync report shows exactly what changed.
+  </Step>
+  
+  <Step title="Test Your Project">
+    ```bash
+    pnpm run build
+    pnpm run test
+    ```
+    
+    Ensure your project still builds and tests pass.
+  </Step>
+  
+  <Step title="Commit Changes">
+    ```bash
+    git add .
+    git commit -m "chore: sync with Beztack template v0.0.12"
+    ```
+  </Step>
+</Steps>
+
+## Examples
+
+### Check for Updates
+
+```bash
+beztack template status
+```
+
+### Update to Latest Version
+
+```bash
+beztack template plan
+beztack template inspect
+beztack template apply
+```
+
+### Update to Specific Version
+
+```bash
+beztack template plan --to 1.2.0
+beztack template apply --to 1.2.0
+```
+
+### Use Local Template for Testing
+
+```bash
+beztack template status --template-root ../beztack
+beztack template apply --template-root ../beztack
+```
+
+### Offline Mode
+
+```bash
+beztack template status --offline
+beztack template plan --offline
+```
+
+### Test Apply Without Changes
+
+```bash
+beztack template apply --dry-run --refresh
+```
+
+## Understanding File Ownership
+
+The template system tracks file ownership:
+
+- **Template-owned**: Files controlled by the Beztack template. Updates are applied automatically.
+- **Custom-owned**: Files you've created or heavily customized. Updates are skipped.
+- **Mixed**: Files that have both template changes and your customizations. May result in conflicts.
+
+Files are tracked in `.beztack/origin.json`, which is created during `beztack create` or when you run `apply` for the first time.
+
+## Handling Conflicts
+
+Conflicts occur when:
+- You've modified a template-owned file
+- The template has also updated that file
+- The changes cannot be automatically merged
+
+**To resolve conflicts**:
+
+1. Review the conflict in the sync report or web inspector
+2. Manually edit the file to incorporate both changes
+3. Test your changes
+4. Commit the resolved version
+
+<Tip>
+  Use the web inspector (`beztack template inspect`) for the best conflict visualization experience.
+</Tip>
+
+## Template Cache
+
+Beztack caches template versions locally in `.beztack/` to improve performance.
+
+- `--refresh`: Forces a fresh download from the template repository
+- `--offline`: Uses only the local cache, never fetching updates
+
+The cache is automatically managed and usually doesn't require manual intervention.
+
+## Reports
+
+All template commands generate a detailed report at:
+
+```
+.beztack/beztack-sync-report.md
+```
+
+This markdown file includes:
+- Summary of changes
+- File-by-file breakdown
+- Side-by-side diffs
+- Conflict indicators
+- Ownership information
+
+<Note>
+  The `.beztack/` directory is automatically added to `.gitignore` and should not be committed to version control.
+</Note>
+
+## Advanced Usage
+
+### Using a Fork as Template Source
+
+If you maintain a fork of Beztack:
+
+```bash
+beztack template status --template-root https://github.com/myorg/beztack-fork.git
+beztack template apply --template-root https://github.com/myorg/beztack-fork.git
+```
+
+### Testing Local Template Changes
+
+If you're developing the Beztack template locally:
+
+```bash
+# In your project directory
+beztack template status --template-root ../beztack
+beztack template apply --template-root ../beztack --dry-run
+```
+
+### Continuous Integration
+
+You can check for template updates in CI:
+
+```yaml
+# .github/workflows/template-check.yml
+name: Check Template Updates
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - run: pnpm dlx beztack template status
+```
+
+<Warning>
+  Do not run `beztack template apply` automatically in CI. Always review changes manually before applying them.
+</Warning>

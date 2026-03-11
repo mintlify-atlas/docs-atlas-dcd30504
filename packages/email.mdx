@@ -1,0 +1,408 @@
+---
+title: "@beztack/email"
+description: "Email sending with React Email templates and Resend"
+---
+
+# Email Package
+
+The `@beztack/email` package provides type-safe email sending with React Email templates and Resend delivery. It includes pre-built templates for common transactional emails.
+
+## Installation
+
+The email package is optional. Add it during project creation:
+
+```bash Terminal
+pnpm dlx beztack init --modules email
+```
+
+Or install manually:
+
+```bash Terminal
+pnpm add @beztack/email --filter @beztack/api
+```
+
+## What's Included
+
+<CardGroup cols={2}>
+  <Card title="React Email" icon="react">
+    Build emails using React components
+  </Card>
+  <Card title="Resend Delivery" icon="paper-plane">
+    Reliable email delivery via Resend API
+  </Card>
+  <Card title="Pre-built Templates" icon="envelope">
+    Welcome, password reset, subscriptions, and invitations
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Fully typed email data and templates
+  </Card>
+</CardGroup>
+
+## Exports
+
+```typescript
+import { sendEmail } from "@beztack/email"
+import type { SendEmailUnifiedProps } from "@beztack/email"
+```
+
+<ResponseField name="sendEmail" type="function">
+  Send templated emails with automatic fallback
+  
+  ```typescript
+  (props: SendEmailUnifiedProps) => Promise<EmailResult>
+  ```
+</ResponseField>
+
+## Available Templates
+
+### Welcome Email
+
+Sent to new users after registration.
+
+```typescript Welcome
+import { sendEmail } from "@beztack/email"
+
+await sendEmail({
+  type: "welcome",
+  to: "user@example.com",
+  data: {
+    username: "John Doe",
+    loginUrl: "https://app.example.com/login",
+  },
+})
+```
+
+**Required Data:**
+
+<ParamField path="username" type="string" required>
+  User's display name
+</ParamField>
+
+<ParamField path="loginUrl" type="string" required>
+  URL to login page
+</ParamField>
+
+### Password Reset
+
+Sent when users request a password reset.
+
+```typescript Reset
+import { sendEmail } from "@beztack/email"
+
+await sendEmail({
+  type: "password-reset",
+  to: "user@example.com",
+  data: {
+    username: "John Doe",
+    resetUrl: "https://app.example.com/reset?token=abc123",
+  },
+})
+```
+
+**Required Data:**
+
+<ParamField path="username" type="string" required>
+  User's display name
+</ParamField>
+
+<ParamField path="resetUrl" type="string" required>
+  Password reset link with token
+</ParamField>
+
+### Subscription Confirmation
+
+Sent after successful subscription purchase.
+
+```typescript Subscription
+import { sendEmail } from "@beztack/email"
+
+await sendEmail({
+  type: "subscription-confirmation",
+  to: "user@example.com",
+  data: {
+    username: "John Doe",
+    planName: "Pro Plan",
+    amount: "$29/month",
+    billingPeriod: "monthly",
+    dashboardUrl: "https://app.example.com/dashboard",
+  },
+})
+```
+
+**Required Data:**
+
+<ParamField path="username" type="string" required>
+  User's display name
+</ParamField>
+
+<ParamField path="planName" type="string" required>
+  Subscription plan name
+</ParamField>
+
+<ParamField path="amount" type="string" required>
+  Formatted price (e.g., "$29/month")
+</ParamField>
+
+<ParamField path="billingPeriod" type="string" required>
+  Billing period ("monthly", "yearly")
+</ParamField>
+
+<ParamField path="dashboardUrl" type="string" required>
+  URL to user dashboard
+</ParamField>
+
+### Organization Invitation
+
+Sent when users are invited to join an organization.
+
+```typescript Invitation
+import { sendEmail } from "@beztack/email"
+
+await sendEmail({
+  type: "organization-invitation",
+  to: "newmember@example.com",
+  data: {
+    invitedByUsername: "Jane Smith",
+    invitedByEmail: "jane@example.com",
+    organizationName: "Acme Corp",
+    invitationUrl: "https://app.example.com/invite?token=xyz789",
+  },
+})
+```
+
+**Required Data:**
+
+<ParamField path="invitedByUsername" type="string" required>
+  Name of person sending invitation
+</ParamField>
+
+<ParamField path="invitedByEmail" type="string" required>
+  Email of person sending invitation
+</ParamField>
+
+<ParamField path="organizationName" type="string" required>
+  Organization name
+</ParamField>
+
+<ParamField path="invitationUrl" type="string" required>
+  Invitation acceptance link
+</ParamField>
+
+## API Reference
+
+### `sendEmail()`
+
+```typescript Function Signature
+type EmailType =
+  | "welcome"
+  | "password-reset"
+  | "subscription-confirmation"
+  | "organization-invitation"
+
+interface SendEmailUnifiedProps {
+  type: EmailType
+  to: string | string[]
+  data: Record<string, unknown>
+}
+
+interface EmailResult {
+  success: boolean
+  data?: {
+    id: string
+    message: string
+  }
+  error?: string
+}
+
+function sendEmail(props: SendEmailUnifiedProps): Promise<EmailResult>
+```
+
+**Parameters:**
+
+<ParamField path="type" type="EmailType" required>
+  Template type to use
+</ParamField>
+
+<ParamField path="to" type="string | string[]" required>
+  Recipient email address(es)
+</ParamField>
+
+<ParamField path="data" type="object" required>
+  Template-specific data (see template sections above)
+</ParamField>
+
+**Returns:**
+
+<ResponseField name="success" type="boolean">
+  Whether email was sent successfully
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Email delivery information (only if success is true)
+  
+  - `id`: Resend email ID
+  - `message`: Success message
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message (only if success is false)
+</ResponseField>
+
+## Usage in API Routes
+
+### Nitro Route Handler
+
+```typescript apps/api/server/routes/api/auth/send-reset.ts
+import { sendEmail } from "@beztack/email"
+import { defineEventHandler, readBody, createError } from "h3"
+
+export default defineEventHandler(async (event) => {
+  const { email, resetToken } = await readBody(event)
+
+  const result = await sendEmail({
+    type: "password-reset",
+    to: email,
+    data: {
+      username: "User",
+      resetUrl: `https://app.example.com/reset?token=${resetToken}`,
+    },
+  })
+
+  if (!result.success) {
+    throw createError({
+      statusCode: 500,
+      message: result.error || "Failed to send email",
+    })
+  }
+
+  return { message: "Reset email sent" }
+})
+```
+
+### With Database Query
+
+```typescript Complete Example
+import { sendEmail } from "@beztack/email"
+import { db, user } from "@beztack/db"
+import { eq } from "drizzle-orm"
+import { defineEventHandler, createError } from "h3"
+
+export default defineEventHandler(async (event) => {
+  const userId = event.context.user?.id
+
+  if (!userId) {
+    throw createError({ statusCode: 401, message: "Unauthorized" })
+  }
+
+  const [currentUser] = await db
+    .select()
+    .from(user)
+    .where(eq(user.id, userId))
+
+  if (!currentUser) {
+    throw createError({ statusCode: 404, message: "User not found" })
+  }
+
+  const result = await sendEmail({
+    type: "welcome",
+    to: currentUser.email,
+    data: {
+      username: currentUser.name,
+      loginUrl: "https://app.example.com/login",
+    },
+  })
+
+  return { success: result.success }
+})
+```
+
+## Configuration
+
+Set up Resend API credentials:
+
+```bash .env
+RESEND_API_KEY=re_xxxxxxxxxxxx
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+RESEND_FROM_NAME=Your App Name
+```
+
+<Note>
+  Get your Resend API key from [resend.com/api-keys](https://resend.com/api-keys) and verify your domain.
+</Note>
+
+## Email Preview
+
+Develop and preview email templates locally:
+
+```bash Terminal
+cd packages/email
+pnpm dev
+```
+
+Opens React Email preview server at `http://localhost:3005`
+
+## Creating Custom Templates
+
+Add new email templates:
+
+**1. Create React component:**
+
+```tsx packages/email/emails/custom.tsx
+import {
+  Body,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Link,
+  Preview,
+  Text,
+} from "@react-email/components"
+
+interface CustomEmailProps {
+  userName: string
+  actionUrl: string
+}
+
+export function CustomEmail({ userName, actionUrl }: CustomEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Preview>Custom email preview text</Preview>
+      <Body style={{ backgroundColor: "#ffffff", fontFamily: "sans-serif" }}>
+        <Container>
+          <Heading>Hello {userName}</Heading>
+          <Text>This is a custom email template.</Text>
+          <Link href={actionUrl}>Take Action</Link>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
+```
+
+**2. Update `sendEmail` types** in `packages/email/lib/send.ts`
+
+## Dependencies
+
+- `resend` ~6.6.0 - Email API
+- `react-email` ~5.0.6 - Email templates
+- `@react-email/components` ~1.0.1 - UI components
+- `@react-email/render` ~2.0.0 - Server-side rendering
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="React Email Docs" icon="react" href="https://react.email/docs">
+    React Email documentation
+  </Card>
+  <Card title="Resend Docs" icon="paper-plane" href="https://resend.com/docs">
+    Resend API documentation
+  </Card>
+  <Card title="Email Module Guide" icon="envelope" href="/api/email">
+    Email integration in Beztack
+  </Card>
+  <Card title="Component Library" icon="shapes" href="https://react.email/docs/components/overview">
+    Available email components
+  </Card>
+</CardGroup>

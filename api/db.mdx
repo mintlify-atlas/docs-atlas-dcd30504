@@ -1,0 +1,434 @@
+---
+title: "@beztack/db"
+description: "Database schema, types, and Drizzle ORM client for PostgreSQL"
+---
+
+The `@beztack/db` package provides the complete database schema, TypeScript types, and Drizzle ORM client for Beztack applications.
+
+## Installation
+
+```bash
+pnpm add @beztack/db
+```
+
+## Exports
+
+### db
+
+Drizzle ORM database client instance configured for PostgreSQL.
+
+<ParamField path="db" type="DrizzleClient">
+  Pre-configured Drizzle client connected to PostgreSQL using `DATABASE_URL` from environment variables.
+</ParamField>
+
+```typescript
+import { db } from "@beztack/db"
+
+const users = await db.select().from(user)
+```
+
+### schema
+
+Complete database schema object containing all table definitions.
+
+<ParamField path="schema" type="Schema">
+  Object containing all Drizzle table definitions for Better Auth adapter and application tables.
+</ParamField>
+
+```typescript
+import { schema } from "@beztack/db"
+
+// Access individual tables
+schema.user
+schema.session
+schema.organization
+```
+
+## Database Tables
+
+### Authentication Tables
+
+<Accordion title="user">
+<ResponseField name="user" type="PgTable">
+  User account table with authentication and subscription information.
+  
+  ```typescript
+  export const user: PgTable<{
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    image: text("image"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false),
+    role: text("role"),
+    banned: boolean("banned").default(false),
+    banReason: text("ban_reason"),
+    banExpires: timestamp("ban_expires"),
+    // Subscription cache (denormalized)
+    subscriptionTier: text("subscription_tier"),
+    subscriptionStatus: text("subscription_status"),
+    subscriptionId: text("subscription_id"),
+    subscriptionValidUntil: timestamp("subscription_valid_until"),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="session">
+<ResponseField name="session" type="PgTable">
+  User session table for Better Auth.
+  
+  ```typescript
+  export const session: PgTable<{
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
+    activeOrganizationId: text("active_organization_id"),
+    activeTeamId: text("active_team_id"),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="account">
+<ResponseField name="account" type="PgTable">
+  OAuth account linkage table.
+  
+  ```typescript
+  export const account: PgTable<{
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="verification">
+<ResponseField name="verification" type="PgTable">
+  Email verification tokens.
+  
+  ```typescript
+  export const verification: PgTable<{
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="twoFactor">
+<ResponseField name="twoFactor" type="PgTable">
+  Two-factor authentication secrets and backup codes.
+  
+  ```typescript
+  export const twoFactor: PgTable<{
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+### Organization & Team Tables
+
+<Accordion title="organization">
+<ResponseField name="organization" type="PgTable">
+  Organization/workspace table with subscription information.
+  
+  ```typescript
+  export const organization: PgTable<{
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").unique(),
+    logo: text("logo"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+    metadata: text("metadata"),
+    // Subscription cache
+    subscriptionTier: text("subscription_tier"),
+    subscriptionStatus: text("subscription_status"),
+    subscriptionId: text("subscription_id"),
+    subscriptionValidUntil: timestamp("subscription_valid_until"),
+    polarCustomerId: text("polar_customer_id"),
+    usageMetrics: text("usage_metrics"),
+    billingManagedByRole: text("billing_managed_by_role").default("owner"),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="member">
+<ResponseField name="member" type="PgTable">
+  Organization membership table.
+  
+  ```typescript
+  export const member: PgTable<{
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").default("member").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="team">
+<ResponseField name="team" type="PgTable">
+  Teams within organizations.
+  
+  ```typescript
+  export const team: PgTable<{
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="teamMember">
+<ResponseField name="teamMember" type="PgTable">
+  Team membership table.
+  
+  ```typescript
+  export const teamMember: PgTable<{
+    id: text("id").primaryKey(),
+    teamId: text("team_id").notNull().references(() => team.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at"),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="invitation">
+<ResponseField name="invitation" type="PgTable">
+  Organization invitations.
+  
+  ```typescript
+  export const invitation: PgTable<{
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role"),
+    teamId: text("team_id"),
+    status: text("status").default("pending").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    inviterId: text("inviter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+### Mercado Pago Tables
+
+<Accordion title="mpPlan">
+<ResponseField name="mpPlan" type="PgTable">
+  Mercado Pago subscription plans with canonical tier mapping.
+  
+  ```typescript
+  export const mpPlan: PgTable<{
+    id: text("id").primaryKey(),
+    applicationId: text("application_id"),
+    collectorId: text("collector_id"),
+    reason: text("reason").notNull(),
+    status: text("status").notNull(),
+    frequency: integer("frequency").notNull(),
+    frequencyType: text("frequency_type").notNull(),
+    transactionAmount: numeric("transaction_amount").notNull(),
+    currencyId: text("currency_id").notNull(),
+    // ... additional fields
+    canonicalTierId: text("canonical_tier_id"), // "free" | "basic" | "pro" | "ultimate"
+    displayName: text("display_name"),
+    features: jsonb("features").$type<string[]>(),
+    limits: jsonb("limits").$type<Record<string, number>>(),
+    permissions: jsonb("permissions").$type<string[]>(),
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Accordion title="mpSubscription">
+<ResponseField name="mpSubscription" type="PgTable">
+  Mercado Pago subscription instances.
+  
+  ```typescript
+  export const mpSubscription: PgTable<{
+    id: text("id").primaryKey(),
+    beztackUserId: text("beztack_user_id").references(() => user.id),
+    organizationId: text("organization_id").references(() => organization.id),
+    preapprovalPlanId: text("preapproval_plan_id").references(() => mpPlan.id),
+    status: text("status").notNull(),
+    nextPaymentDate: timestamp("next_payment_date"),
+    // ... additional fields
+  }>
+  ```
+</ResponseField>
+</Accordion>
+
+<Expandable title="Other Mercado Pago Tables">
+- `mpOrder` - Payment orders
+- `mpPayment` - Payment transactions
+- `mpInvoice` - Subscription invoices
+- `mpRefund` - Payment refunds
+- `mpChargeback` - Chargeback records
+- `mpWebhookLog` - Webhook processing logs
+</Expandable>
+
+## Usage Examples
+
+### Querying Data
+
+```typescript
+import { db, user, organization } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+// Select all users
+const users = await db.select().from(user)
+
+// Select with WHERE clause
+const john = await db.select().from(user).where(eq(user.email, "john@example.com"))
+
+// Select specific columns
+const userNames = await db.select({ name: user.name, email: user.email }).from(user)
+```
+
+### Inserting Data
+
+```typescript
+import { db, user } from "@beztack/db"
+
+const newUser = await db
+  .insert(user)
+  .values({
+    id: "user_123",
+    name: "John Doe",
+    email: "john@example.com",
+    emailVerified: false,
+  })
+  .returning()
+```
+
+### Updating Data
+
+```typescript
+import { db, user } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+const updated = await db
+  .update(user)
+  .set({ emailVerified: true })
+  .where(eq(user.id, "user_123"))
+  .returning()
+```
+
+### Joining Tables
+
+```typescript
+import { db, user, member, organization } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+const userOrgs = await db
+  .select({
+    user: user,
+    organization: organization,
+    role: member.role,
+  })
+  .from(user)
+  .innerJoin(member, eq(member.userId, user.id))
+  .innerJoin(organization, eq(organization.id, member.organizationId))
+  .where(eq(user.id, "user_123"))
+```
+
+### Using in API Routes
+
+```typescript
+import { defineEventHandler } from "h3"
+import { db, user } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+export default defineEventHandler(async (event) => {
+  const { email } = await readBody(event)
+
+  const existingUser = await db.select().from(user).where(eq(user.email, email))
+
+  if (existingUser.length > 0) {
+    throw createError({ statusCode: 409, message: "User already exists" })
+  }
+
+  const newUser = await db.insert(user).values({ email }).returning()
+
+  return newUser[0]
+})
+```
+
+## TypeScript Types
+
+Drizzle automatically generates TypeScript types from the schema:
+
+```typescript
+import type { InferSelectModel, InferInsertModel } from "drizzle-orm"
+import { user, organization } from "@beztack/db"
+
+// Infer select type (read from database)
+type User = InferSelectModel<typeof user>
+
+// Infer insert type (write to database)
+type NewUser = InferInsertModel<typeof user>
+
+// Use in function signatures
+function processUser(user: User): void {
+  console.log(user.email)
+}
+
+function createUser(data: NewUser): Promise<User> {
+  // ...
+}
+```
+
+## Database Migrations
+
+```bash
+# Generate migration from schema changes
+pnpm migrate
+
+# Push schema changes directly (development only)
+pnpm push
+```
+
+## Related Resources
+
+- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [Better Auth Database Schema](https://www.better-auth.com/docs/concepts/database)

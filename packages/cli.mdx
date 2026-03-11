@@ -1,0 +1,385 @@
+---
+title: "beztack (CLI)"
+description: "Command-line interface for creating and managing Beztack projects"
+---
+
+# Beztack CLI
+
+The Beztack CLI provides commands for scaffolding new projects, managing optional modules, and synchronizing with template updates.
+
+## Installation
+
+Run without installation using `pnpm dlx`:
+
+```bash Terminal
+pnpm dlx beztack create
+```
+
+Or install globally:
+
+```bash Terminal
+pnpm add -g beztack
+beztack create
+```
+
+## Commands
+
+### `create`
+
+Create a new Beztack project from the template.
+
+```bash Terminal
+pnpm dlx beztack create
+```
+
+**Interactive Mode** (default):
+
+Prompts you for:
+- Project name
+- Project description
+- Module selection (email, ai, ocr, state, payments)
+- Payment provider (if payments selected)
+- Git initialization
+- Dependency installation
+
+**Non-Interactive Mode:**
+
+```bash Flags
+pnpm dlx beztack create \
+  --yes \
+  --name my-app \
+  --description "My awesome app" \
+  --modules ai,email,payments \
+  --payment-provider mercadopago \
+  --git \
+  --install
+```
+
+<ParamField path="--yes" type="flag">
+  Run in non-interactive mode (alias: `--non-interactive`)
+</ParamField>
+
+<ParamField path="--name" type="string">
+  Project directory name
+</ParamField>
+
+<ParamField path="--description" type="string">
+  Project description for package.json
+</ParamField>
+
+<ParamField path="--modules" type="string">
+  Comma-separated list of optional modules: `ai`, `email`, `ocr`, `state`, `payments`
+</ParamField>
+
+<ParamField path="--payment-provider" type="enum">
+  Payment provider when using payments module
+  
+  **Options:** `polar` | `mercadopago`
+</ParamField>
+
+<ParamField path="--git" type="flag">
+  Initialize git repository (default: prompts)
+</ParamField>
+
+<ParamField path="--no-git" type="flag">
+  Skip git initialization
+</ParamField>
+
+<ParamField path="--install" type="flag">
+  Install dependencies after creation (default: prompts)
+</ParamField>
+
+<ParamField path="--no-install" type="flag">
+  Skip dependency installation
+</ParamField>
+
+<ParamField path="--init" type="flag">
+  Run module initialization after creation
+</ParamField>
+
+<ParamField path="--no-init" type="flag">
+  Skip module initialization
+</ParamField>
+
+<ParamField path="--template-source" type="string">
+  Custom template source (path or URL)
+</ParamField>
+
+### `init`
+
+Configure modules in an existing Beztack project.
+
+```bash Terminal
+beztack init
+```
+
+Use this command to:
+- Enable optional modules (email, ai, ocr, state, payments)
+- Configure payment providers
+- Update module dependencies
+
+**Interactive Mode:**
+
+```bash Terminal
+beztack init
+```
+
+Prompts for module selection.
+
+**Non-Interactive Mode:**
+
+```bash Flags
+beztack init \
+  --modules ai,email \
+  --payment-provider polar
+```
+
+<ParamField path="--modules" type="string">
+  Comma-separated optional modules to enable
+</ParamField>
+
+<ParamField path="--payment-provider" type="enum">
+  **Options:** `polar` | `mercadopago`
+</ParamField>
+
+### `template`
+
+Manage template synchronization for keeping your project up-to-date with the latest Beztack template.
+
+<Note>
+  Template sync is an advanced feature for applying upstream template changes to your project while preserving your customizations.
+</Note>
+
+**Subcommands:**
+
+```bash Status
+beztack template status
+```
+
+Check current template version and available updates.
+
+```bash Plan
+beztack template plan --to 1.2.0
+```
+
+Preview changes that would be applied when upgrading to a specific version.
+
+```bash Apply
+beztack template apply
+```
+
+Apply template updates to your project.
+
+```bash Inspect
+beztack template inspect --port 3434
+```
+
+Launch interactive web UI for reviewing template changes.
+
+**Template Flags:**
+
+<ParamField path="--refresh" type="flag">
+  Force template cache refresh before running command
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only local template cache (no network)
+</ParamField>
+
+<ParamField path="--dry-run" type="flag">
+  Preview changes without applying them (for `apply`)
+</ParamField>
+
+<ParamField path="--to" type="string">
+  Target template version (for `plan`)
+</ParamField>
+
+<ParamField path="--host" type="string">
+  Host for inspect server (default: `127.0.0.1`)
+</ParamField>
+
+<ParamField path="--port" type="number">
+  Port for inspect server (default: `3434`)
+</ParamField>
+
+### `help`
+
+Show help information.
+
+```bash Terminal
+beztack help
+beztack --help
+beztack -h
+```
+
+## Global Flags
+
+<ParamField path="-d, --debug" type="flag">
+  Show command outputs and detailed debug information
+</ParamField>
+
+## Available Modules
+
+Optional modules you can enable:
+
+<CardGroup cols={2}>
+  <Card title="AI" icon="sparkles">
+    Vercel AI SDK with Amazon Bedrock integration
+  </Card>
+  <Card title="Email" icon="envelope">
+    React Email templates with Resend delivery
+  </Card>
+  <Card title="OCR" icon="scanner">
+    Text extraction from images using Tesseract.js
+  </Card>
+  <Card title="State" icon="link">
+    URL state management with nuqs
+  </Card>
+  <Card title="Payments" icon="credit-card">
+    Subscription billing (Polar or Mercado Pago)
+  </Card>
+</CardGroup>
+
+## Examples
+
+### Quick Start (Interactive)
+
+```bash Terminal
+pnpm dlx beztack create
+# Follow prompts to configure your project
+```
+
+### Automated Project Creation
+
+```bash Non-Interactive
+pnpm dlx beztack create \
+  --yes \
+  --name saas-starter \
+  --description "My SaaS application" \
+  --modules payments,email,ai \
+  --payment-provider polar \
+  --git \
+  --install
+```
+
+### Add Modules to Existing Project
+
+```bash Terminal
+cd my-existing-project
+beztack init --modules ai,ocr
+```
+
+### Custom Template Source
+
+```bash Local Template
+pnpm dlx beztack create \
+  --yes \
+  --name my-app \
+  --template-source ../beztack
+```
+
+### Template Sync Workflow
+
+```bash Update Project
+# Check for updates
+beztack template status
+
+# Plan upgrade
+beztack template plan --to 1.3.0
+
+# Review changes interactively
+beztack template inspect
+
+# Apply update
+beztack template apply
+```
+
+## Programmatic API
+
+The CLI can also be used as a library:
+
+```typescript Usage
+import {
+  initProject,
+  regenerateEntrypoints,
+  removeModule,
+  modules,
+  runTemplateCommand,
+} from "beztack"
+import type { ModuleDefinition, PaymentProvider } from "beztack"
+
+// Initialize modules
+await initProject({
+  enabledModules: ["ai", "email", "payments"],
+  paymentProvider: "polar",
+})
+
+// Remove a module
+await removeModule("ocr")
+
+// List available modules
+console.log(modules)
+```
+
+<ResponseField name="initProject" type="function">
+  Configure enabled modules in the project
+  
+  ```typescript
+  (options: {
+    enabledModules: string[]
+    paymentProvider?: PaymentProvider
+  }) => Promise<void>
+  ```
+</ResponseField>
+
+<ResponseField name="removeModule" type="function">
+  Remove a module from the project
+  
+  ```typescript
+  (moduleName: string) => Promise<void>
+  ```
+</ResponseField>
+
+<ResponseField name="regenerateEntrypoints" type="function">
+  Regenerate package.json exports for workspace packages
+  
+  ```typescript
+  () => Promise<void>
+  ```
+</ResponseField>
+
+<ResponseField name="modules" type="ModuleDefinition[]">
+  Array of all available module definitions
+</ResponseField>
+
+## Type Definitions
+
+```typescript Types
+export type PaymentProvider = "polar" | "mercadopago"
+export type AppName = "api" | "ui" | "docs"
+
+export interface ModuleDefinition {
+  name: string
+  label: string
+  description?: string
+  required: boolean
+  packageDir?: string
+  npmDeps?: string[]
+  nxProjects?: string[]
+  fileGlobs?: string[]
+  codemods?: string[]
+  hasApiModule?: boolean
+  hasUiFeature?: boolean
+}
+```
+
+## Dependencies
+
+- `@clack/prompts` - Interactive CLI prompts
+- `glob` - File pattern matching
+- `picocolors` - Terminal colors
+- `ts-morph` - TypeScript AST manipulation for codemods
+
+## Source Code
+
+CLI implementation: `packages/cli/src/cli.ts:1-480`

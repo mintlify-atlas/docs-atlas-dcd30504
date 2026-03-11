@@ -1,0 +1,413 @@
+---
+title: Environment Variables
+description: Complete guide to required environment variables, validation with T3 Env, and security best practices
+---
+
+Beztack uses [T3 Env](https://env.t3.gg) for type-safe environment variable validation at build time.
+
+## Required Environment Variables
+
+Copy `.env.example` to `.env` and configure these variables:
+
+### Database
+
+```bash .env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
+```
+
+<Info>
+  For production, use a managed PostgreSQL service like Vercel Postgres, Supabase, or Neon.
+</Info>
+
+### Authentication
+
+```bash .env
+BETTER_AUTH_SECRET="my-better-auth-secret"  # Generate with: openssl rand -base64 32
+BETTER_AUTH_URL="http://localhost:3000"     # Base URL of your API
+APP_NAME="beztack"                          # Used for email templates and 2FA issuer
+```
+
+<Warning>
+  `BETTER_AUTH_SECRET` must be at least 32 characters. Generate a secure secret with `openssl rand -base64 32`.
+</Warning>
+
+### Payment Provider Selection
+
+```bash .env
+PAYMENT_PROVIDER="polar"  # or "mercadopago"
+VITE_PAYMENT_PROVIDER="polar"  # Frontend needs to know the provider
+```
+
+### Polar (Payment Provider)
+
+```bash .env
+POLAR_ACCESS_TOKEN="polar_oat_***"           # API access token
+POLAR_WEBHOOK_SECRET="whsec_***"             # Webhook signing secret
+POLAR_SERVER="sandbox"                       # "sandbox" or "production"
+POLAR_ORGANIZATION_ID="***-***-***-***"      # Your organization ID
+
+# Product IDs from Polar dashboard
+POLAR_BASIC_MONTHLY_PRODUCT_ID="***-***-***-***"
+POLAR_BASIC_YEARLY_PRODUCT_ID="***-***-***-***"
+POLAR_PRO_MONTHLY_PRODUCT_ID="***-***-***-***"
+POLAR_PRO_YEARLY_PRODUCT_ID="***-***-***-***"
+POLAR_ULTIMATE_MONTHLY_PRODUCT_ID="***-***-***-***"
+POLAR_ULTIMATE_YEARLY_PRODUCT_ID="***-***-***-***"
+
+# Checkout URLs
+POLAR_SUCCESS_URL="http://localhost:5173/checkout-success"
+POLAR_CANCEL_URL="http://localhost:5173/pricing"
+```
+
+### Mercado Pago (Payment Provider)
+
+```bash .env
+MERCADO_PAGO_ACCESS_TOKEN="APP_USR-***"
+MERCADO_PAGO_PUBLIC_KEY="APP_USR-***"
+MERCADO_PAGO_WEBHOOK_SECRET="your_webhook_secret_here"
+```
+
+### Provider-Neutral Payment URLs
+
+```bash .env
+# These override provider-specific URLs
+PAYMENTS_SUCCESS_URL="http://localhost:5173/checkout-success"
+PAYMENTS_CANCEL_URL="http://localhost:5173/pricing"
+```
+
+### Email (Resend)
+
+```bash .env
+RESEND_FROM_NAME="Facundo"
+RESEND_FROM_EMAIL="email@facundovalerio.com"
+RESEND_API_KEY="re_***"
+```
+
+<Info>
+  Get a free Resend API key at [resend.com](https://resend.com). Verify your domain to send emails in production.
+</Info>
+
+### Frontend API URL
+
+```bash .env
+VITE_API_URL="http://localhost:3000"  # Backend API URL
+```
+
+### Subscription Mode
+
+```bash .env
+SUBSCRIPTION_MODE="organization"  # "user" or "organization"
+```
+
+<Tip>
+  Use `"organization"` for B2B SaaS where subscriptions are tied to organizations. Use `"user"` for B2C applications.
+</Tip>
+
+## Complete `.env.example`
+
+Here's the complete `.env.example` from the repository:
+
+```bash .env.example
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
+
+BETTER_AUTH_SECRET=my-better-auth-secret
+BETTER_AUTH_URL=http://localhost:3000 #Base URL of your app
+VITE_API_URL=http://localhost:3000
+APP_NAME=beztack
+
+POLAR_ACCESS_TOKEN=polar_oat_*******************************************
+POLAR_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+POLAR_SERVER=sandbox
+
+# Product IDs from your Polar sandbox (replace with your actual product IDs)
+POLAR_BASIC_MONTHLY_PRODUCT_ID=********-****-****-****-************
+POLAR_BASIC_YEARLY_PRODUCT_ID=********-****-****-****-************
+POLAR_PRO_MONTHLY_PRODUCT_ID=********-****-****-****-************
+POLAR_PRO_YEARLY_PRODUCT_ID=********-****-****-****-************
+POLAR_ULTIMATE_MONTHLY_PRODUCT_ID=********-****-****-************
+POLAR_ULTIMATE_YEARLY_PRODUCT_ID=********-****-****-****-************
+
+# Checkout URLs
+PAYMENTS_SUCCESS_URL=http://localhost:5173/checkout-success
+PAYMENTS_CANCEL_URL=http://localhost:5173/pricing
+POLAR_SUCCESS_URL=http://localhost:5173/checkout-success
+POLAR_CANCEL_URL=http://localhost:5173/pricing
+POLAR_ORGANIZATION_ID=********-****-****-****-************
+
+RESEND_FROM_NAME=Facundo
+RESEND_FROM_EMAIL=email@facundovalerio.com
+RESEND_API_KEY=re_********_************************
+
+# Mercado Pago
+MERCADO_PAGO_ACCESS_TOKEN=APP_USR-***********************
+MERCADO_PAGO_PUBLIC_KEY=APP_USR-***********************
+MERCADO_PAGO_WEBHOOK_SECRET=your_webhook_secret_here
+
+# Provider selection
+PAYMENT_PROVIDER=polar
+VITE_PAYMENT_PROVIDER=polar
+```
+
+## Environment Validation with T3 Env
+
+Beztack validates environment variables at build time using T3 Env.
+
+### API Environment Schema
+
+The schema is defined in `packages/env/src/api.ts`:
+
+```typescript packages/env/src/api.ts
+import { createEnv } from "@t3-oss/env-core"
+import { z } from "zod"
+
+export const env = createEnv({
+  server: {
+    // Database
+    DATABASE_URL: z.string().url(),
+
+    // Better Auth
+    BETTER_AUTH_SECRET: z.string().min(1),
+    BETTER_AUTH_URL: z.string().url(),
+    APP_NAME: z.string().min(1).default("beztack"),
+
+    // Polar
+    POLAR_ACCESS_TOKEN: z.string().default(""),
+    POLAR_WEBHOOK_SECRET: z.string().default(""),
+    POLAR_SERVER: z.enum(["sandbox", "production"]).default("sandbox"),
+    POLAR_BASIC_MONTHLY_PRODUCT_ID: z.string().default(""),
+    POLAR_BASIC_YEARLY_PRODUCT_ID: z.string().default(""),
+    POLAR_PRO_MONTHLY_PRODUCT_ID: z.string().default(""),
+    POLAR_PRO_YEARLY_PRODUCT_ID: z.string().default(""),
+    POLAR_ULTIMATE_MONTHLY_PRODUCT_ID: z.string().default(""),
+    POLAR_ULTIMATE_YEARLY_PRODUCT_ID: z.string().default(""),
+    POLAR_SUCCESS_URL: z.string().default(""),
+    POLAR_CANCEL_URL: z.string().default(""),
+    POLAR_ORGANIZATION_ID: z.string().default(""),
+
+    // Provider-neutral payment URLs
+    PAYMENTS_SUCCESS_URL: z.string().default(""),
+    PAYMENTS_CANCEL_URL: z.string().default(""),
+
+    // Resend
+    RESEND_FROM_NAME: z.string().min(1),
+    RESEND_FROM_EMAIL: z.string().email(),
+    RESEND_API_KEY: z.string().min(1),
+
+    // MercadoPago
+    MERCADO_PAGO_ACCESS_TOKEN: z.string().default(""),
+    MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(""),
+
+    // Payment Provider Switch
+    PAYMENT_PROVIDER: z.enum(["polar", "mercadopago"]).default("polar"),
+
+    // Subscription Mode
+    SUBSCRIPTION_MODE: z.enum(["user", "organization"]).default("organization"),
+
+    // UI URL
+    APP_URL: z.string().url(),
+
+    // Node
+    NODE_ENV: z
+      .enum(["development", "production", "test"])
+      .default("development"),
+  },
+  runtimeEnv: process.env,
+  emptyStringAsUndefined: true,
+})
+```
+
+### Runtime Validation
+
+T3 Env validates required variables based on the selected payment provider:
+
+```typescript packages/env/src/api.ts
+const activePaymentProvider = env.PAYMENT_PROVIDER
+
+if (activePaymentProvider === "polar") {
+  assertRequired("POLAR_ACCESS_TOKEN", env.POLAR_ACCESS_TOKEN)
+  assertRequired("POLAR_WEBHOOK_SECRET", env.POLAR_WEBHOOK_SECRET)
+  assertRequired("POLAR_ORGANIZATION_ID", env.POLAR_ORGANIZATION_ID)
+  // ... validate all Polar product IDs
+}
+
+if (activePaymentProvider === "mercadopago") {
+  assertRequired("MERCADO_PAGO_ACCESS_TOKEN", env.MERCADO_PAGO_ACCESS_TOKEN)
+}
+```
+
+### Frontend Environment Schema
+
+The frontend has a separate schema in `packages/env/src/ui.ts`:
+
+```typescript packages/env/src/ui.ts
+import { createEnv } from "@t3-oss/env-core"
+import { z } from "zod"
+
+export const env = createEnv({
+  client: {
+    VITE_API_URL: z.string().url(),
+    VITE_PAYMENT_PROVIDER: z.enum(["polar", "mercadopago"]).default("polar"),
+  },
+  runtimeEnv: import.meta.env,
+})
+```
+
+<Info>
+  Frontend variables must be prefixed with `VITE_` to be exposed to the client.
+</Info>
+
+## Different Environments
+
+### Development
+
+```bash .env.development
+NODE_ENV=development
+BETTER_AUTH_URL=http://localhost:3000
+VITE_API_URL=http://localhost:3000
+POLAR_SERVER=sandbox
+```
+
+### Staging
+
+```bash .env.staging
+NODE_ENV=production
+BETTER_AUTH_URL=https://staging-api.myapp.com
+VITE_API_URL=https://staging-api.myapp.com
+POLAR_SERVER=sandbox
+```
+
+### Production
+
+```bash .env.production
+NODE_ENV=production
+BETTER_AUTH_URL=https://api.myapp.com
+VITE_API_URL=https://api.myapp.com
+POLAR_SERVER=production
+```
+
+## Security Best Practices
+
+### Never Commit Secrets
+
+Add `.env` to `.gitignore`:
+
+```bash .gitignore
+# Environment variables
+.env
+.env.local
+.env.*.local
+```
+
+### Use Environment Variable Providers
+
+For production, use your hosting provider's environment variable management:
+
+- **Vercel**: Project Settings → Environment Variables
+- **Railway**: Project Settings → Variables
+- **Cloudflare**: Workers & Pages → Settings → Environment Variables
+- **Docker**: Use `.env` files or docker-compose environment sections
+
+### Rotate Secrets Regularly
+
+Rotate sensitive secrets periodically:
+
+1. Generate new `BETTER_AUTH_SECRET`
+2. Update in production environment
+3. Redeploy application
+4. Invalidate old sessions (users will need to re-login)
+
+### Use Different Secrets Per Environment
+
+Never reuse secrets between development, staging, and production:
+
+```bash
+# Development
+BETTER_AUTH_SECRET=dev-secret-12345
+
+# Staging
+BETTER_AUTH_SECRET=staging-secret-67890
+
+# Production
+BETTER_AUTH_SECRET=prod-secret-abcdef
+```
+
+### Restrict API Access
+
+Limit API access to specific domains in production:
+
+```typescript apps/api/server/utils/auth.ts
+trustedOrigins: [
+  env.NODE_ENV === "production"
+    ? "https://myapp.com"
+    : "http://localhost:5173",
+]
+```
+
+## Accessing Environment Variables
+
+### Server-side (API)
+
+```typescript apps/api/server/routes/example.ts
+import { env } from "@beztack/env/api"
+
+export default defineEventHandler(() => {
+  const apiUrl = env.BETTER_AUTH_URL
+  const paymentProvider = env.PAYMENT_PROVIDER
+
+  return { apiUrl, paymentProvider }
+})
+```
+
+### Client-side (Frontend)
+
+```typescript apps/ui/src/lib/config.ts
+import { env } from "@beztack/env/ui"
+
+export const config = {
+  apiUrl: env.VITE_API_URL,
+  paymentProvider: env.VITE_PAYMENT_PROVIDER,
+}
+```
+
+<Warning>
+  Only variables prefixed with `VITE_` are exposed to the frontend. Never expose secrets like API keys or database credentials to the client.
+</Warning>
+
+## Troubleshooting
+
+### Build Fails with Missing Environment Variable
+
+If the build fails with "Missing environment variable", check:
+
+1. Variable is defined in `.env`
+2. Variable name matches the schema in `packages/env/src/api.ts`
+3. Frontend variables are prefixed with `VITE_`
+4. Run `pnpm dev` to reload environment variables
+
+### Environment Variables Not Updating
+
+If changes to `.env` aren't reflected:
+
+1. Restart the dev server: `pnpm dev`
+2. Clear build cache: `rm -rf .nx/cache`
+3. Rebuild: `pnpm build`
+
+### Production Deployment Issues
+
+If environment variables work locally but not in production:
+
+1. Verify variables are set in hosting provider's dashboard
+2. Check for typos in variable names
+3. Ensure sensitive variables are marked as "secret" or "encrypted"
+4. Redeploy after adding/updating variables
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment" href="/guides/deployment">
+    Deploy to production with proper environment configuration
+  </Card>
+  <Card title="Authentication" href="/guides/authentication">
+    Set up authentication with Better Auth
+  </Card>
+</CardGroup>

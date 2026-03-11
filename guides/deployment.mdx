@@ -1,0 +1,516 @@
+---
+title: Deployment
+description: Deploy Beztack to Vercel, Cloudflare, Node.js, or Docker with production configuration
+---
+
+Beztack is designed to deploy anywhere. Choose the deployment option that best fits your needs.
+
+## Deployment Options
+
+Beztack supports multiple deployment targets:
+
+- **Vercel** - Zero-config deployment for both frontend and API
+- **Cloudflare** - Edge deployment with global distribution
+- **Node.js** - Traditional server deployment
+- **Docker** - Containerized deployment for any platform
+
+## Vercel Deployment
+
+Vercel is the recommended deployment platform for Beztack.
+
+<Steps>
+
+<Step title="Install Vercel CLI">
+  ```bash
+  npm i -g vercel
+  ```
+</Step>
+
+<Step title="Configure Environment Variables">
+  Add production environment variables in Vercel dashboard:
+
+  - `DATABASE_URL` - PostgreSQL connection string
+  - `BETTER_AUTH_SECRET` - Generate with `openssl rand -base64 32`
+  - `BETTER_AUTH_URL` - Your production URL (e.g., `https://myapp.vercel.app`)
+  - `POLAR_ACCESS_TOKEN` - Polar API token (if using Polar)
+  - `RESEND_API_KEY` - Email API key
+
+  See [Environment Variables](/guides/environment-variables) for the complete list.
+</Step>
+
+<Step title="Deploy Frontend and API">
+  Beztack uses a monorepo with separate deployments:
+
+  ```bash
+  # Deploy the frontend (apps/ui)
+  cd apps/ui
+  vercel
+
+  # Deploy the API (apps/api)
+  cd apps/api
+  vercel
+  ```
+</Step>
+
+<Step title="Configure CORS and Proxy">
+  Update `BETTER_AUTH_URL` to point to your API domain:
+
+  ```bash
+  BETTER_AUTH_URL=https://myapp-api.vercel.app
+  ```
+
+  Add the API domain to trusted origins in `apps/api/server/utils/auth.ts`:
+
+  ```typescript
+  trustedOrigins: [
+    "https://myapp.vercel.app",
+    "https://myapp-ui.vercel.app",
+    "https://myapp-api.vercel.app",
+  ]
+  ```
+</Step>
+
+</Steps>
+
+### Vercel Configuration
+
+The frontend is configured in `apps/ui/vercel.json`:
+
+```json apps/ui/vercel.json
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+### Build Commands
+
+Vercel automatically detects NX and runs the correct build commands:
+
+```bash
+# Frontend build
+nx build ui
+
+# API build
+nx build api
+```
+
+## Cloudflare Deployment
+
+Deploy to Cloudflare Workers for edge computing.
+
+<Steps>
+
+<Step title="Configure Nitro for Cloudflare">
+  Update `apps/api/nitro.config.ts`:
+
+  ```typescript
+  export default defineNitroConfig({
+    preset: "cloudflare-pages",
+    // ... other config
+  })
+  ```
+</Step>
+
+<Step title="Build and Deploy">
+  ```bash
+  # Build the API
+  nx build api
+
+  # Deploy to Cloudflare Pages
+  npx wrangler pages deploy apps/api/.output/public
+  ```
+</Step>
+
+<Step title="Configure Database">
+  Use a PostgreSQL provider with edge support:
+
+  - **Neon** - Serverless PostgreSQL with edge support
+  - **Supabase** - PostgreSQL with connection pooling
+  - **Cloudflare D1** - SQLite at the edge (requires schema changes)
+</Step>
+
+</Steps>
+
+## Node.js Deployment
+
+Deploy to any Node.js hosting provider.
+
+<Steps>
+
+<Step title="Build the Applications">
+  ```bash
+  pnpm build
+  ```
+</Step>
+
+<Step title="Run Database Migrations">
+  ```bash
+  pnpm migrate
+  ```
+</Step>
+
+<Step title="Start the Applications">
+  ```bash
+  # Start API server
+  cd apps/api
+  node .output/server/index.mjs
+
+  # Serve frontend (use a static server like nginx)
+  cd apps/ui
+  npx serve dist
+  ```
+</Step>
+
+</Steps>
+
+### Production Server Configuration
+
+```bash
+# Set environment variables
+export NODE_ENV=production
+export DATABASE_URL="postgresql://..."
+export BETTER_AUTH_SECRET="..."
+export BETTER_AUTH_URL="https://api.myapp.com"
+
+# Run migrations
+pnpm migrate
+
+# Start API server
+node apps/api/.output/server/index.mjs
+```
+
+## Docker Deployment
+
+Containerize Beztack for deployment to any platform.
+
+### Dockerfile for API
+
+```dockerfile Dockerfile.api
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+
+# Install dependencies
+FROM base AS dependencies
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/
+COPY packages/*/package.json packages/*/
+RUN pnpm install --frozen-lockfile
+
+# Build application
+FROM base AS build
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+RUN pnpm build --filter @beztack/api
+
+# Production image
+FROM base AS production
+WORKDIR /app
+COPY --from=build /app/apps/api/.output ./.output
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]
+```
+
+### Dockerfile for Frontend
+
+```dockerfile Dockerfile.ui
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+
+# Install dependencies
+FROM base AS dependencies
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/ui/package.json apps/ui/
+COPY packages/*/package.json packages/*/
+RUN pnpm install --frozen-lockfile
+
+# Build application
+FROM base AS build
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+RUN pnpm build --filter @beztack/ui
+
+# Production image with nginx
+FROM nginx:alpine AS production
+COPY --from=build /app/apps/ui/dist /usr/share/nginx/html
+COPY apps/ui/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Docker Compose
+
+```yaml docker-compose.yml
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: beztack
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/beztack
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: http://localhost:3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+```
+
+### Deploy with Docker Compose
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# Run migrations
+docker-compose exec api pnpm migrate
+
+# View logs
+docker-compose logs -f
+```
+
+## Environment Configuration
+
+### Production Environment Variables
+
+Ensure these are set in production:
+
+```bash .env.production
+NODE_ENV=production
+
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/database
+
+# Authentication
+BETTER_AUTH_SECRET=<generate-with-openssl-rand-base64-32>
+BETTER_AUTH_URL=https://api.myapp.com
+APP_NAME=myapp
+
+# Payment Provider (Polar or Mercado Pago)
+PAYMENT_PROVIDER=polar
+POLAR_ACCESS_TOKEN=polar_oat_***
+POLAR_WEBHOOK_SECRET=whsec_***
+POLAR_SERVER=production
+POLAR_ORGANIZATION_ID=***
+
+# Email
+RESEND_API_KEY=re_***
+RESEND_FROM_EMAIL=noreply@myapp.com
+RESEND_FROM_NAME=MyApp
+
+# URLs
+APP_URL=https://myapp.com
+PAYMENTS_SUCCESS_URL=https://myapp.com/checkout-success
+PAYMENTS_CANCEL_URL=https://myapp.com/pricing
+```
+
+<Warning>
+  Never commit `.env` files to version control. Use your hosting provider's environment variable management.
+</Warning>
+
+## Database Migrations
+
+Run migrations before deploying new code:
+
+### Manual Migration
+
+```bash
+# SSH into your server
+ssh user@server
+
+# Navigate to project
+cd /path/to/beztack
+
+# Run migrations
+pnpm migrate
+
+# Restart services
+pm2 restart api
+```
+
+### Automated Migration (CI/CD)
+
+Add migration step to your deployment pipeline:
+
+```yaml .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm migrate
+
+      - name: Build
+        run: pnpm build
+
+      - name: Deploy to Vercel
+        run: vercel --prod
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+```
+
+## Build Process
+
+The NX build system handles all build steps:
+
+```json package.json
+{
+  "scripts": {
+    "build": "nx run-many -t build",
+    "start": "nx run-many -t start",
+    "dev": "nx run-many -t dev --parallel=10",
+    "migrate": "pnpm --filter @beztack/db migrate"
+  }
+}
+```
+
+### Build Outputs
+
+- **Frontend (`apps/ui`)**: Static files in `apps/ui/dist`
+- **API (`apps/api`)**: Nitro output in `apps/api/.output`
+- **Docs (`apps/docs`)**: Next.js output in `apps/docs/.next`
+
+## Health Checks
+
+Implement health check endpoints for monitoring:
+
+```typescript apps/api/server/routes/health.get.ts
+import { defineEventHandler } from "h3"
+import { db } from "@beztack/db"
+
+export default defineEventHandler(async () => {
+  try {
+    // Check database connection
+    await db.execute(sql`SELECT 1`)
+
+    return {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+    }
+  } catch (error) {
+    throw createError({
+      statusCode: 503,
+      message: "Service unhealthy",
+    })
+  }
+})
+```
+
+## Performance Optimization
+
+### Frontend Optimization
+
+- **Code splitting**: Vite automatically splits code by routes
+- **Image optimization**: Use `<img loading="lazy">` for images
+- **Caching**: Configure CDN caching headers
+
+### API Optimization
+
+- **Connection pooling**: PostgreSQL connection pooling is enabled by default
+- **Query optimization**: Use Drizzle's query builder for efficient queries
+- **Caching**: Implement Redis caching for frequently accessed data
+
+## Monitoring and Logging
+
+### Application Monitoring
+
+Recommended monitoring tools:
+
+- **Sentry** - Error tracking and performance monitoring
+- **LogRocket** - Session replay and error tracking
+- **Datadog** - Infrastructure and application monitoring
+
+### Database Monitoring
+
+- **Vercel Postgres** - Built-in monitoring dashboard
+- **Supabase** - Database metrics and query performance
+- **PgHero** - PostgreSQL performance dashboard
+
+## Rollback Strategy
+
+### Vercel Rollback
+
+```bash
+# List deployments
+vercel ls
+
+# Promote a previous deployment
+vercel promote <deployment-url>
+```
+
+### Docker Rollback
+
+```bash
+# Tag images with version
+docker build -t myapp:v1.2.3 .
+
+# Rollback to previous version
+docker-compose down
+docker-compose up -d myapp:v1.2.2
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" href="/guides/environment-variables">
+    Configure all required environment variables
+  </Card>
+  <Card title="Database" href="/guides/database">
+    Set up and migrate your production database
+  </Card>
+</CardGroup>

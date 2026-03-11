@@ -1,0 +1,457 @@
+---
+title: Database
+description: PostgreSQL setup, Drizzle ORM usage, migrations, and schema design patterns
+---
+
+Beztack uses PostgreSQL with [Drizzle ORM](https://orm.drizzle.team) for type-safe database operations.
+
+## PostgreSQL Setup
+
+### Local Development
+
+<Steps>
+
+<Step title="Install PostgreSQL">
+  Install PostgreSQL locally:
+
+  <CodeGroup>
+    ```bash macOS
+    brew install postgresql@16
+    brew services start postgresql@16
+    ```
+
+    ```bash Ubuntu/Debian
+    sudo apt install postgresql postgresql-contrib
+    sudo systemctl start postgresql
+    ```
+
+    ```bash Docker
+    docker run -d \
+      --name postgres \
+      -e POSTGRES_PASSWORD=postgres \
+      -p 5432:5432 \
+      postgres:16
+    ```
+  </CodeGroup>
+</Step>
+
+<Step title="Configure Database URL">
+  Add the database URL to your `.env` file:
+
+  ```bash .env
+  DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
+  ```
+</Step>
+
+<Step title="Run Migrations">
+  Apply the database schema:
+
+  ```bash
+  pnpm migrate
+  ```
+</Step>
+
+</Steps>
+
+### Production Setup
+
+For production, use a managed PostgreSQL service:
+
+- **Vercel Postgres** - Integrated with Vercel deployments
+- **Supabase** - Open-source PostgreSQL platform
+- **Neon** - Serverless PostgreSQL
+- **Railway** - Simple PostgreSQL hosting
+
+<Info>
+  All providers give you a `DATABASE_URL` connection string to add to your environment variables.
+</Info>
+
+## Drizzle ORM
+
+Drizzle provides type-safe database queries with zero runtime overhead.
+
+### Database Client
+
+The database client is configured in `packages/db/src/client.ts`:
+
+```typescript packages/db/src/client.ts
+import { drizzle } from "drizzle-orm/node-postgres"
+import { Pool } from "pg"
+import * as schema from "./schema"
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
+
+export const db = drizzle(pool, { schema })
+```
+
+### Querying Data
+
+Drizzle provides a fluent API for queries:
+
+```typescript
+import { db } from "@beztack/db"
+import { user } from "@beztack/db/schema"
+import { eq } from "drizzle-orm"
+
+// Select all users
+const users = await db.select().from(user)
+
+// Select with filter
+const activeUsers = await db
+  .select()
+  .from(user)
+  .where(eq(user.banned, false))
+
+// Select single user
+const userById = await db
+  .select()
+  .from(user)
+  .where(eq(user.id, "user-id"))
+  .limit(1)
+```
+
+### Insert Data
+
+```typescript
+import { db } from "@beztack/db"
+import { user } from "@beztack/db/schema"
+
+const [newUser] = await db
+  .insert(user)
+  .values({
+    id: "user-123",
+    name: "John Doe",
+    email: "john@example.com",
+    emailVerified: false,
+  })
+  .returning()
+```
+
+### Update Data
+
+```typescript
+import { db } from "@beztack/db"
+import { user } from "@beztack/db/schema"
+import { eq } from "drizzle-orm"
+
+const [updated] = await db
+  .update(user)
+  .set({ emailVerified: true })
+  .where(eq(user.id, "user-123"))
+  .returning()
+```
+
+### Delete Data
+
+```typescript
+import { db } from "@beztack/db"
+import { user } from "@beztack/db/schema"
+import { eq } from "drizzle-orm"
+
+await db.delete(user).where(eq(user.id, "user-123"))
+```
+
+## Schema Design
+
+The database schema is defined in `packages/db/src/schema.ts` using Drizzle's table builder.
+
+### Table Definition
+
+```typescript packages/db/src/schema.ts
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
+  // Subscription cache (denormalized)
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+  subscriptionId: text("subscription_id"),
+  subscriptionValidUntil: timestamp("subscription_valid_until"),
+})
+```
+
+### Foreign Keys and Relations
+
+```typescript packages/db/src/schema.ts
+import { pgTable, text, timestamp } from "drizzle-orm/pg-core"
+
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export const member = pgTable("member", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  role: text("role").default("member").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+```
+
+### Indexes
+
+Add indexes for frequently queried columns:
+
+```typescript packages/db/src/schema.ts
+import { pgTable, text, index } from "drizzle-orm/pg-core"
+
+export const mpPayment = pgTable(
+  "mp_payment",
+  {
+    id: text("id").primaryKey(),
+    beztackUserId: text("beztack_user_id").references(() => user.id),
+    status: text("status").notNull(),
+    payerEmail: text("payer_email"),
+    dateCreated: timestamp("date_created"),
+  },
+  (table) => [
+    index("mp_payment_user_idx").on(table.beztackUserId),
+    index("mp_payment_status_idx").on(table.status),
+    index("mp_payment_payer_email_idx").on(table.payerEmail),
+  ]
+)
+```
+
+## Migrations
+
+### Creating Migrations
+
+Generate a migration when you change the schema:
+
+```bash
+pnpm migrate
+```
+
+This runs:
+1. `drizzle-kit generate` - Creates migration SQL files
+2. `drizzle-kit migrate` - Applies migrations to database
+
+Migration files are saved in `packages/db/drizzle/`.
+
+### Push Schema Changes
+
+For rapid development, push schema changes directly without migrations:
+
+```bash
+pnpm push
+```
+
+<Warning>
+  Only use `pnpm push` in development. Always use migrations in production to preserve data.
+</Warning>
+
+### Migration Configuration
+
+The Drizzle configuration is in `packages/db/drizzle.config.ts`:
+
+```typescript packages/db/drizzle.config.ts
+import { defineConfig } from "drizzle-kit"
+
+export default defineConfig({
+  out: "./drizzle",
+  schema: "./src/schema.ts",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL,
+  },
+})
+```
+
+### Running Migrations in Production
+
+Add a migration step to your deployment pipeline:
+
+```bash
+# Before starting the application
+pnpm migrate
+
+# Then start the app
+pnpm start
+```
+
+For Vercel, add a build script in `package.json`:
+
+```json package.json
+{
+  "scripts": {
+    "build": "pnpm migrate && nx build api"
+  }
+}
+```
+
+## Advanced Queries
+
+### Joins
+
+```typescript
+import { db } from "@beztack/db"
+import { user, organization, member } from "@beztack/db/schema"
+import { eq } from "drizzle-orm"
+
+const usersWithOrgs = await db
+  .select({
+    userId: user.id,
+    userName: user.name,
+    orgName: organization.name,
+    role: member.role,
+  })
+  .from(user)
+  .leftJoin(member, eq(member.userId, user.id))
+  .leftJoin(organization, eq(organization.id, member.organizationId))
+```
+
+### Aggregations
+
+```typescript
+import { db } from "@beztack/db"
+import { member } from "@beztack/db/schema"
+import { count, eq } from "drizzle-orm"
+
+const memberCount = await db
+  .select({ count: count() })
+  .from(member)
+  .where(eq(member.organizationId, "org-123"))
+```
+
+### Transactions
+
+```typescript
+import { db } from "@beztack/db"
+import { user, organization, member } from "@beztack/db/schema"
+
+await db.transaction(async (tx) => {
+  const [newUser] = await tx
+    .insert(user)
+    .values({ id: "user-123", name: "John", email: "john@example.com" })
+    .returning()
+
+  const [newOrg] = await tx
+    .insert(organization)
+    .values({ id: "org-123", name: "Acme Corp" })
+    .returning()
+
+  await tx.insert(member).values({
+    id: "member-123",
+    userId: newUser.id,
+    organizationId: newOrg.id,
+    role: "owner",
+  })
+})
+```
+
+## Type Safety
+
+Drizzle automatically infers TypeScript types from your schema:
+
+```typescript
+import type { InferSelectModel, InferInsertModel } from "drizzle-orm"
+import { user } from "@beztack/db/schema"
+
+// Type for selecting a user (includes defaults and generated values)
+type User = InferSelectModel<typeof user>
+
+// Type for inserting a user (only required fields)
+type NewUser = InferInsertModel<typeof user>
+
+const newUser: NewUser = {
+  id: "user-123",
+  name: "John Doe",
+  email: "john@example.com",
+  emailVerified: false,
+}
+```
+
+## Schema Patterns
+
+### Timestamps
+
+Add automatic timestamps to all tables:
+
+```typescript
+import { timestamp } from "drizzle-orm/pg-core"
+
+export const myTable = pgTable("my_table", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+})
+```
+
+### Soft Deletes
+
+```typescript
+import { timestamp, boolean } from "drizzle-orm/pg-core"
+
+export const myTable = pgTable("my_table", {
+  id: text("id").primaryKey(),
+  deletedAt: timestamp("deleted_at"),
+})
+
+// Query only non-deleted records
+const active = await db
+  .select()
+  .from(myTable)
+  .where(isNull(myTable.deletedAt))
+```
+
+### JSONB Columns
+
+```typescript
+import { jsonb } from "drizzle-orm/pg-core"
+
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  metadata: jsonb("metadata").$type<{
+    industry?: string
+    companySize?: number
+    customFields?: Record<string, unknown>
+  }>(),
+})
+```
+
+## Drizzle Studio
+
+Drizzle Studio is a visual database browser:
+
+```bash
+pnpx drizzle-kit studio
+```
+
+Open `https://local.drizzle.studio` to browse your database.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/guides/authentication">
+    Learn about user authentication
+  </Card>
+  <Card title="Payments" href="/guides/payments">
+    Integrate subscription payments
+  </Card>
+</CardGroup>

@@ -1,0 +1,266 @@
+---
+title: "Architecture Overview"
+description: "Understanding Beztack's three-app monorepo architecture and how the pieces fit together"
+---
+
+Beztack is built as a production-ready TypeScript monorepo with a clean separation of concerns. The architecture is designed for scalability, type safety, and developer productivity.
+
+## High-Level Structure
+
+Beztack consists of three main applications and a collection of shared packages:
+
+```
+apps/
+├── ui/          # Frontend SPA (Vite + React 19)
+├── api/         # Backend Server (Nitro/h3)
+└── docs/        # Landing & Documentation (Next.js + Fumadocs)
+
+packages/
+├── ai/          # AI SDK integration (Vercel AI + Amazon Bedrock)
+├── cli/         # CLI tools for project initialization
+├── db/          # Database schema and migrations (Drizzle ORM)
+├── email/       # Email templates (React Email)
+├── env/         # Environment validation (T3 Env)
+├── ocr/         # OCR utilities (Tesseract.js)
+└── state/       # URL state management (nuqs)
+```
+
+## The Three Apps
+
+<CardGroup cols={3}>
+  <Card title="apps/ui" icon="browser" href="#frontend-ui">
+    React 19 SPA with Vite, TanStack Router & Query
+  </Card>
+  <Card title="apps/api" icon="server" href="#backend-api">
+    Nitro server with Drizzle ORM and Better Auth
+  </Card>
+  <Card title="apps/docs" icon="book" href="#documentation-docs">
+    Next.js 15 with Fumadocs for beautiful MDX docs
+  </Card>
+</CardGroup>
+
+### Frontend (UI)
+
+The `apps/ui` application is a modern single-page application built for speed and developer experience:
+
+**Stack:**
+- **Vite** - Lightning-fast HMR and optimized builds
+- **React 19** - Latest React with modern patterns
+- **shadcn/ui** - Accessible component library with Tailwind CSS v4
+- **TanStack Router** - Type-safe file-based routing
+- **TanStack Query** - Server state management with caching
+- **Radix UI** - Unstyled, accessible component primitives
+
+**Key Features:**
+- File-based routing with type safety
+- Auto-generated API client with full TypeScript inference
+- Built-in authentication flows (login, signup, 2FA, password reset)
+- URL state management with nuqs
+- Optimized production builds with code splitting
+
+### Backend (API)
+
+The `apps/api` application is an edge-ready server built on Nitro:
+
+**Stack:**
+- **Nitro (h3)** - Universal server framework, runs anywhere
+- **Better Auth** - Full-featured auth with 2FA, Organizations, Admin roles
+- **Drizzle ORM** - Type-safe database queries and migrations
+- **PostgreSQL** - Primary database (compatible with any Postgres provider)
+- **Zod** - Runtime validation for API requests
+
+**Key Features:**
+- File-based routing with auto-imports
+- Modular architecture (auth, payments, email, AI, OCR)
+- Type-safe database access with Drizzle
+- Built-in webhook handling (Polar, Mercado Pago)
+- Environment variable validation with T3 Env
+- Portable - deploys to Vercel, Cloudflare, Node.js, Docker
+
+### Documentation (Docs)
+
+The `apps/docs` application serves as both landing page and documentation:
+
+**Stack:**
+- **Next.js 15** - React framework with App Router
+- **Fumadocs** - Beautiful MDX-based documentation
+- **Tailwind CSS** - Utility-first styling
+
+**Key Features:**
+- SEO-optimized with metadata generation
+- Static site generation for fast loads
+- Full-text search
+- Mobile-responsive navigation
+
+## Shared Packages
+
+Packages are internal libraries shared across apps. They follow a consistent structure:
+
+<CardGroup cols={2}>
+  <Card title="@beztack/db" icon="database">
+    Database schema, migrations, and Drizzle ORM configuration. Used by `api`.
+  </Card>
+  <Card title="@beztack/env" icon="shield-check">
+    Centralized environment variable validation with T3 Env and Zod schemas.
+  </Card>
+  <Card title="@beztack/ai" icon="sparkles">
+    AI SDK integration with streaming, tool calling, and structured output.
+  </Card>
+  <Card title="@beztack/email" icon="envelope">
+    React Email templates for transactional emails. Used by `api`.
+  </Card>
+  <Card title="@beztack/state" icon="link">
+    URL state management with nuqs. Type-safe parsers for search params.
+  </Card>
+  <Card title="@beztack/ocr" icon="eye">
+    Optical Character Recognition utilities with Tesseract.js.
+  </Card>
+  <Card title="@beztack/cli" icon="terminal">
+    CLI tools for project initialization and module management.
+  </Card>
+</CardGroup>
+
+## Data Flow
+
+Here's how data flows through the Beztack architecture:
+
+<Steps>
+  <Step title="User Interaction">
+    User interacts with the React frontend (`apps/ui`) through components and routes.
+  </Step>
+  
+  <Step title="API Request">
+    TanStack Query sends type-safe HTTP requests to the Nitro backend (`apps/api`).
+  </Step>
+  
+  <Step title="Request Validation">
+    Nitro route handler validates request with Zod schemas and authenticates with Better Auth.
+  </Step>
+  
+  <Step title="Database Query">
+    Backend queries PostgreSQL using Drizzle ORM from `@beztack/db` package.
+  </Step>
+  
+  <Step title="Response">
+    Type-safe response flows back through TanStack Query to React components.
+  </Step>
+</Steps>
+
+### Example Flow: User Login
+
+```typescript
+// 1. UI Component (apps/ui/src/features/auth/login.tsx)
+const { mutate: login } = useMutation({
+	async mutationFn(data: { email: string; password: string }) {
+		return await authClient.signIn.email(data)
+	},
+})
+
+// 2. Better Auth Client sends request to API
+// POST /api/auth/sign-in/email
+
+// 3. Better Auth middleware (apps/api/server/modules/auth/better-auth.ts)
+// Validates credentials, creates session
+
+// 4. Database query via Drizzle (packages/db/schema.ts)
+const user = await db.query.user.findFirst({
+	where: eq(user.email, email),
+})
+
+// 5. Response with session token flows back to UI
+```
+
+## Dependency Graph
+
+The monorepo has clear dependency boundaries:
+
+```
+apps/ui → @beztack/state, @beztack/env
+apps/api → @beztack/db, @beztack/email, @beztack/ai, @beztack/env
+apps/docs → @beztack/state (for interactive examples)
+
+@beztack/db → drizzle-orm, better-auth
+@beztack/email → @react-email/components
+@beztack/ai → ai (Vercel AI SDK)
+@beztack/env → @t3-oss/env-core, zod
+```
+
+<Note>
+**No circular dependencies:** Packages never depend on apps, and apps only depend on packages they actually use.
+</Note>
+
+## Build & Deployment Architecture
+
+Beztack uses NX for intelligent build orchestration:
+
+<Steps>
+  <Step title="Dependency Analysis">
+    NX analyzes the project graph to determine what needs to be built.
+  </Step>
+  
+  <Step title="Parallel Builds">
+    Packages are built in dependency order, with parallelization where possible.
+  </Step>
+  
+  <Step title="Caching">
+    NX caches build outputs locally and remotely (NX Cloud) for faster rebuilds.
+  </Step>
+  
+  <Step title="Affected Tasks">
+    Only projects affected by code changes are rebuilt (`nx affected -t build`).
+  </Step>
+</Steps>
+
+### Deployment Targets
+
+Each app can deploy independently:
+
+| App | Deployment Options |
+|-----|-------------------|
+| **UI** | Vercel, Netlify, Cloudflare Pages, Static hosting |
+| **API** | Vercel Functions, Cloudflare Workers, Node.js, Docker |
+| **Docs** | Vercel, Netlify, GitHub Pages (static export) |
+
+<Tip>
+**Edge-ready:** The Nitro backend is framework-agnostic and runs on Vercel, Cloudflare, AWS Lambda, or traditional Node.js servers.
+</Tip>
+
+## Environment Configuration
+
+Beztack uses T3 Env for type-safe environment variable validation:
+
+```typescript
+// packages/env/src/client.ts (for UI)
+export const env = createEnv({
+	client: {
+		VITE_API_URL: z.string().url(),
+		VITE_PAYMENT_PROVIDER: z.enum(["polar", "mercadopago"]),
+	},
+	runtimeEnv: import.meta.env,
+})
+
+// packages/env/src/server.ts (for API)
+export const env = createEnv({
+	server: {
+		DATABASE_URL: z.string().url(),
+		BETTER_AUTH_SECRET: z.string().min(32),
+		POLAR_ACCESS_TOKEN: z.string().optional(),
+	},
+	runtimeEnv: process.env,
+})
+```
+
+<Warning>
+Environment validation happens at **build time**, ensuring you never deploy with missing or invalid configuration.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Setup" icon="layer-group" href="/concepts/monorepo">
+    Learn how NX orchestrates the monorepo
+  </Card>
+  <Card title="Module System" icon="puzzle-piece" href="/concepts/modules">
+    Understand Beztack's modular architecture
+  </Card>
+</CardGroup>

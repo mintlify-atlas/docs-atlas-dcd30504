@@ -1,0 +1,163 @@
+---
+title: Introduction
+description: A production-ready TypeScript monorepo starter with modern tools and best practices built-in
+---
+
+# Introduction to Beztack
+
+**You want to ship. You need this.**
+
+Beztack is a modern TypeScript monorepo starter designed to help you ship faster. Stop wasting time on boilerplate configuration and start building your product with enterprise-grade tooling from day one.
+
+## What Problem Does Beztack Solve?
+
+Building a modern web application requires integrating dozens of tools and libraries. Most developers spend weeks configuring:
+
+- Build tools and development environments
+- Authentication with 2FA and organizations
+- Database schemas and type-safe queries
+- Payment integrations and webhooks
+- Email templates and deliverability
+- Code quality and formatting tools
+- Monorepo tooling and workspace management
+
+Beztack eliminates this setup time by providing a **production-ready foundation** with all these features pre-configured and working together seamlessly.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Authentication Ready" icon="shield-check">
+    better-auth with 2FA, Organizations, Admin roles, and Polar integration out of the box
+  </Card>
+  <Card title="Type-Safe Database" icon="database">
+    Drizzle ORM with full TypeScript support and automatic migrations
+  </Card>
+  <Card title="Modern UI Components" icon="palette">
+    shadcn/ui components with Tailwind CSS v4 - customizable and accessible
+  </Card>
+  <Card title="AI Ready" icon="brain">
+    Vercel AI SDK with streaming, tool calling, and structured output
+  </Card>
+  <Card title="Payments Built-in" icon="credit-card">
+    Polar integration for subscriptions and payments
+  </Card>
+  <Card title="URL State Management" icon="link">
+    nuqs for type-safe URL search params synchronization
+  </Card>
+  <Card title="Environment Validation" icon="check-circle">
+    T3 Env for build-time environment variable validation with Zod schemas
+  </Card>
+  <Card title="Fast Code Quality" icon="zap">
+    Biome/Ultracite for lightning-fast linting and formatting
+  </Card>
+</CardGroup>
+
+## Architecture
+
+Beztack uses a monorepo architecture powered by **NX** with three specialized apps:
+
+```
+apps/
+├── ui/          # Frontend SPA (Vite + React)
+├── api/         # Backend Server (Nitro)
+└── docs/        # Landing & Documentation (Next.js + Fumadocs)
+
+packages/
+├── ai/          # AI SDK integration (Vercel AI + Amazon Bedrock)
+├── cli/         # CLI tools for project scaffolding
+├── email/       # Email templates (React Email)
+├── env/         # Environment validation (T3 Env)
+├── ocr/         # OCR utilities
+└── state/       # URL state management (nuqs)
+```
+
+### Frontend (`apps/ui`)
+
+- **Vite** for lightning-fast HMR and optimized builds
+- **React 19** with modern concurrent features
+- **shadcn/ui** components built on Radix UI primitives
+- **TanStack Router** for type-safe client-side routing
+- **TanStack Query** for server state management and caching
+- **Tailwind CSS v4** for utility-first styling
+
+### Backend (`apps/api`)
+
+- **Nitro** (h3) for edge-ready, portable server architecture
+- **better-auth** for authentication with 2FA, Organizations, and Admin roles
+- **Drizzle ORM** for type-safe database queries with PostgreSQL
+- **Polar** integration for payments and subscriptions
+- File-based routing with auto-imports
+- Full TypeScript support with Zod validation
+
+### Documentation (`apps/docs`)
+
+- **Next.js 15** with App Router for optimal performance
+- **Fumadocs** for beautiful MDX documentation
+- Server-side rendering and static generation
+- SEO optimized out of the box
+
+## Technology Stack
+
+| Category | Technology |
+|----------|------------|
+| **Monorepo** | NX |
+| **Package Manager** | pnpm |
+| **Frontend** | Vite, React 19, shadcn/ui, Tailwind CSS v4 |
+| **Backend** | Nitro (h3), Drizzle ORM, PostgreSQL |
+| **Authentication** | better-auth |
+| **Payments** | Polar, Mercado Pago |
+| **AI** | Vercel AI SDK, Amazon Bedrock |
+| **Documentation** | Next.js 15, Fumadocs |
+| **Validation** | Zod, T3 Env |
+| **State Management** | nuqs, TanStack Query |
+| **Code Quality** | Biome, Ultracite |
+| **Git Hooks** | Lefthook |
+
+## Who Is Beztack For?
+
+<CardGroup cols={2}>
+  <Card title="Startup Founders" icon="rocket">
+    Launch your MVP quickly with production-ready infrastructure
+  </Card>
+  <Card title="Full-Stack Developers" icon="code">
+    Skip the boilerplate and focus on your unique features
+  </Card>
+  <Card title="Development Teams" icon="users">
+    Standardize your tech stack with proven tools and patterns
+  </Card>
+  <Card title="SaaS Builders" icon="building">
+    Auth, payments, and subscriptions ready to go
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+- **SaaS Applications** - Authentication, subscriptions, and user management built-in
+- **AI-Powered Apps** - Vercel AI SDK integrated with streaming and tool calling
+- **E-commerce Platforms** - Payment processing with Polar or Mercado Pago
+- **Internal Tools** - Fast development with type-safe APIs and modern UI
+- **Multi-tenant Applications** - Organization support with better-auth
+
+## Deployment Options
+
+Beztack is designed to deploy anywhere:
+
+- **Vercel** - Optimized for both frontend and serverless API
+- **Cloudflare** - Edge deployment ready
+- **Node.js** - Traditional server deployment
+- **Docker** - Containerized deployment
+
+## License
+
+Beztack is licensed under the **APGL-3.0** license.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Create your first Beztack project in 5 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation and configuration guide
+  </Card>
+</CardGroup>

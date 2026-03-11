@@ -1,0 +1,465 @@
+---
+title: Payments
+description: Set up payment providers (Polar and Mercado Pago), implement subscriptions, and handle webhooks
+---
+
+Beztack provides a unified payment abstraction that supports multiple payment providers. Switch between **Polar** and **Mercado Pago** via configuration.
+
+## Payment Provider Setup
+
+Set the payment provider in your `.env` file:
+
+```bash .env
+# Choose your provider
+PAYMENT_PROVIDER=polar  # or "mercadopago"
+
+# Provider-neutral success/cancel URLs
+PAYMENTS_SUCCESS_URL=http://localhost:5173/checkout-success
+PAYMENTS_CANCEL_URL=http://localhost:5173/pricing
+```
+
+## Polar Setup
+
+[Polar](https://polar.sh) is a payment platform for developers and open-source projects.
+
+<Steps>
+
+<Step title="Create a Polar Account">
+  Sign up at [polar.sh](https://polar.sh) and create an organization.
+</Step>
+
+<Step title="Get API Credentials">
+  Generate an access token in Polar dashboard under Settings → API.
+</Step>
+
+<Step title="Create Products">
+  Create subscription products in the Polar dashboard. Copy the product IDs.
+</Step>
+
+<Step title="Configure Environment Variables">
+  Add these to your `.env` file:
+
+  ```bash .env
+  PAYMENT_PROVIDER=polar
+
+  POLAR_ACCESS_TOKEN=polar_oat_***
+  POLAR_WEBHOOK_SECRET=whsec_***
+  POLAR_SERVER=sandbox  # or "production"
+  POLAR_ORGANIZATION_ID=********-****-****-****-************
+
+  # Product IDs from your Polar dashboard
+  POLAR_BASIC_MONTHLY_PRODUCT_ID=********-****-****-****-************
+  POLAR_BASIC_YEARLY_PRODUCT_ID=********-****-****-****-************
+  POLAR_PRO_MONTHLY_PRODUCT_ID=********-****-****-****-************
+  POLAR_PRO_YEARLY_PRODUCT_ID=********-****-****-****-************
+  POLAR_ULTIMATE_MONTHLY_PRODUCT_ID=********-****-****-****-************
+  POLAR_ULTIMATE_YEARLY_PRODUCT_ID=********-****-****-****-************
+
+  POLAR_SUCCESS_URL=http://localhost:5173/checkout-success
+  POLAR_CANCEL_URL=http://localhost:5173/pricing
+  ```
+</Step>
+
+</Steps>
+
+<Info>
+  Start with `sandbox` mode for testing. Switch to `production` when ready to go live.
+</Info>
+
+## Mercado Pago Setup
+
+[Mercado Pago](https://mercadopago.com) is a popular payment platform in Latin America.
+
+<Steps>
+
+<Step title="Create a Mercado Pago Account">
+  Sign up at [mercadopago.com](https://mercadopago.com) and complete KYC verification.
+</Step>
+
+<Step title="Get API Credentials">
+  Go to Your integrations → Credentials and copy your access token.
+</Step>
+
+<Step title="Configure Environment Variables">
+  ```bash .env
+  PAYMENT_PROVIDER=mercadopago
+
+  MERCADO_PAGO_ACCESS_TOKEN=APP_USR-***
+  MERCADO_PAGO_PUBLIC_KEY=APP_USR-***
+  MERCADO_PAGO_WEBHOOK_SECRET=your_webhook_secret_here
+
+  PAYMENTS_SUCCESS_URL=http://localhost:5173/checkout-success
+  PAYMENTS_CANCEL_URL=http://localhost:5173/pricing
+  ```
+</Step>
+
+</Steps>
+
+## Unified Payment API
+
+The payment abstraction provides a consistent API regardless of provider.
+
+### Get Payment Provider
+
+```typescript apps/api/server/routes/api/checkout.post.ts
+import { getPaymentProvider } from "@/lib/payments"
+
+const provider = getPaymentProvider()
+```
+
+### List Products
+
+```typescript
+import { getPaymentProvider } from "@/lib/payments"
+
+export default defineEventHandler(async () => {
+  const provider = getPaymentProvider()
+  const products = await provider.listProducts()
+
+  return { products }
+})
+```
+
+### Create Checkout Session
+
+```typescript apps/api/server/routes/api/checkout.post.ts
+import { defineEventHandler, readBody, createError } from "h3"
+import { getPaymentProvider } from "@/lib/payments"
+import { auth } from "server/utils/auth"
+import { z } from "zod"
+
+const schema = z.object({
+  productId: z.string(),
+})
+
+export default defineEventHandler(async (event) => {
+  const session = await auth.api.getSession({ headers: event.headers })
+  if (!session) {
+    throw createError({ statusCode: 401, message: "Unauthorized" })
+  }
+
+  const body = await readBody(event)
+  const { productId } = schema.parse(body)
+
+  const provider = getPaymentProvider()
+  const checkout = await provider.createCheckout({
+    productId,
+    customerEmail: session.user.email,
+    successUrl: env.PAYMENTS_SUCCESS_URL,
+    cancelUrl: env.PAYMENTS_CANCEL_URL,
+  })
+
+  return { checkoutUrl: checkout.url }
+})
+```
+
+## Implementing Subscriptions
+
+### Frontend: Pricing Page
+
+```typescript apps/ui/src/pages/pricing.tsx
+import { useMutation } from "@tanstack/react-query"
+
+function PricingPage() {
+  const createCheckout = useMutation({
+    mutationFn: async (productId: string) => {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId }),
+      })
+      return response.json()
+    },
+    onSuccess: (data) => {
+      window.location.href = data.checkoutUrl
+    },
+  })
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => createCheckout.mutate("product-id")}
+      >
+        Subscribe to Pro
+      </button>
+    </div>
+  )
+}
+```
+
+### Backend: List Subscriptions
+
+```typescript apps/api/server/routes/api/subscriptions.get.ts
+import { defineEventHandler, createError } from "h3"
+import { getPaymentProvider } from "@/lib/payments"
+import { auth } from "server/utils/auth"
+
+export default defineEventHandler(async (event) => {
+  const session = await auth.api.getSession({ headers: event.headers })
+  if (!session) {
+    throw createError({ statusCode: 401, message: "Unauthorized" })
+  }
+
+  const provider = getPaymentProvider()
+  const subscriptions = await provider.listSubscriptions({
+    customerEmail: session.user.email,
+  })
+
+  return { subscriptions }
+})
+```
+
+### Cancel Subscription
+
+```typescript apps/api/server/routes/api/subscriptions/[id]/cancel.post.ts
+import { defineEventHandler, getRouterParam, createError } from "h3"
+import { getPaymentProvider } from "@/lib/payments"
+import { auth } from "server/utils/auth"
+
+export default defineEventHandler(async (event) => {
+  const session = await auth.api.getSession({ headers: event.headers })
+  if (!session) {
+    throw createError({ statusCode: 401, message: "Unauthorized" })
+  }
+
+  const subscriptionId = getRouterParam(event, "id")
+  if (!subscriptionId) {
+    throw createError({ statusCode: 400, message: "Missing subscription ID" })
+  }
+
+  const provider = getPaymentProvider()
+  const subscription = await provider.cancelSubscription(subscriptionId)
+
+  return { subscription }
+})
+```
+
+## Handling Webhooks
+
+Webhooks notify your application of payment events.
+
+### Configure Webhook URL
+
+Set up webhooks in your payment provider's dashboard:
+
+- **Polar**: `https://your-app.com/api/webhooks/polar`
+- **Mercado Pago**: `https://your-app.com/api/payments/mercado-pago/webhook`
+
+### Webhook Handler
+
+```typescript apps/api/server/routes/api/webhooks/polar.post.ts
+import { defineEventHandler, readRawBody, getHeader } from "h3"
+import { getPaymentProvider } from "@/lib/payments"
+import { db } from "@beztack/db"
+import { user } from "@beztack/db/schema"
+import { eq } from "drizzle-orm"
+
+export default defineEventHandler(async (event) => {
+  const rawBody = await readRawBody(event)
+  const signature = getHeader(event, "webhook-signature")
+
+  if (!rawBody || !signature) {
+    throw createError({ statusCode: 400, message: "Missing webhook data" })
+  }
+
+  const provider = getPaymentProvider()
+  const webhook = await provider.parseWebhook(rawBody, signature)
+
+  // Handle subscription events
+  if (webhook.type === "subscription.active") {
+    const subscription = webhook.subscription
+    if (subscription) {
+      // Update user subscription status
+      await db
+        .update(user)
+        .set({
+          subscriptionStatus: subscription.status,
+          subscriptionId: subscription.id,
+        })
+        .where(eq(user.email, subscription.customerEmail ?? ""))
+    }
+  }
+
+  if (webhook.type === "subscription.canceled") {
+    const subscription = webhook.subscription
+    if (subscription) {
+      await db
+        .update(user)
+        .set({
+          subscriptionStatus: "canceled",
+        })
+        .where(eq(user.email, subscription.customerEmail ?? ""))
+    }
+  }
+
+  return { received: true }
+})
+```
+
+### Webhook Events
+
+The unified webhook payload includes these event types:
+
+| Event Type | Description |
+|------------|-------------|
+| `subscription.created` | New subscription created |
+| `subscription.active` | Subscription activated |
+| `subscription.updated` | Subscription updated |
+| `subscription.canceled` | Subscription canceled |
+| `subscription.paused` | Subscription paused |
+| `subscription.past_due` | Payment failed |
+| `payment.success` | One-time payment succeeded |
+| `payment.failed` | Payment failed |
+| `customer.created` | New customer created |
+| `customer.updated` | Customer updated |
+
+## Testing Payments
+
+### Polar Sandbox
+
+Polar's sandbox mode uses test cards:
+
+- **Success**: `4242 4242 4242 4242`
+- **Decline**: `4000 0000 0000 0002`
+
+### Mercado Pago Test Cards
+
+Use these test cards in Mercado Pago sandbox:
+
+| Card Number | Status |
+|-------------|--------|
+| `5031 7557 3453 0604` | Approved |
+| `5031 4332 1540 6351` | Rejected |
+
+<Info>
+  Use any future expiry date and any 3-digit CVV for test cards.
+</Info>
+
+## Subscription Database Schema
+
+Beztack caches subscription data for fast access:
+
+```typescript packages/db/src/schema.ts
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  // Subscription cache (updated by webhooks)
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+  subscriptionId: text("subscription_id"),
+  subscriptionValidUntil: timestamp("subscription_valid_until"),
+})
+
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  // Subscription cache
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+  subscriptionId: text("subscription_id"),
+  subscriptionValidUntil: timestamp("subscription_valid_until"),
+  polarCustomerId: text("polar_customer_id"),
+})
+```
+
+## Payment Provider Types
+
+The payment abstraction uses these unified types:
+
+```typescript apps/api/lib/payments/types.ts
+export type Product = {
+  id: string
+  name: string
+  description?: string
+  price: {
+    amount: number
+    currency: string
+  }
+  interval: "month" | "year" | "day" | "week"
+  intervalCount: number
+  metadata?: Record<string, unknown>
+}
+
+export type Subscription = {
+  id: string
+  status: "active" | "inactive" | "pending" | "canceled" | "paused" | "past_due"
+  productId: string
+  productName?: string
+  customerId: string
+  customerEmail?: string
+  currentPeriodStart?: Date
+  currentPeriodEnd?: Date
+  cancelAtPeriodEnd?: boolean
+  metadata?: Record<string, unknown>
+}
+```
+
+## Customer Portal
+
+Polar provides a customer portal for self-service subscription management:
+
+```typescript apps/api/server/routes/api/portal.post.ts
+import { defineEventHandler, createError } from "h3"
+import { getPaymentProvider } from "@/lib/payments"
+import { auth } from "server/utils/auth"
+
+export default defineEventHandler(async (event) => {
+  const session = await auth.api.getSession({ headers: event.headers })
+  if (!session) {
+    throw createError({ statusCode: 401, message: "Unauthorized" })
+  }
+
+  const provider = getPaymentProvider()
+  if (!provider.createPortalSession) {
+    throw createError({ statusCode: 501, message: "Portal not supported" })
+  }
+
+  const customer = await provider.getCustomerByEmail(session.user.email)
+  if (!customer) {
+    throw createError({ statusCode: 404, message: "Customer not found" })
+  }
+
+  const portalUrl = await provider.createPortalSession(
+    customer.id,
+    env.APP_URL
+  )
+
+  return { portalUrl }
+})
+```
+
+## Environment Validation
+
+The payment provider validates environment variables at build time:
+
+```typescript packages/env/src/api.ts
+import { createEnv } from "@t3-oss/env-core"
+
+export const env = createEnv({
+  server: {
+    // Payment Provider Switch
+    PAYMENT_PROVIDER: z.enum(["polar", "mercadopago"]).default("polar"),
+
+    // Polar
+    POLAR_ACCESS_TOKEN: z.string().default(""),
+    POLAR_WEBHOOK_SECRET: z.string().default(""),
+    POLAR_ORGANIZATION_ID: z.string().default(""),
+
+    // Mercado Pago
+    MERCADO_PAGO_ACCESS_TOKEN: z.string().default(""),
+    MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(""),
+  },
+})
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/guides/authentication">
+    Restrict payments to authenticated users
+  </Card>
+  <Card title="Database" href="/guides/database">
+    Store subscription data
+  </Card>
+</CardGroup>

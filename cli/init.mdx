@@ -1,0 +1,355 @@
+---
+title: beztack init
+description: Configure modules in an existing Beztack project
+---
+
+The `beztack init` command configures optional modules in an existing Beztack project. It enables or disables feature modules like payments, email, AI, OCR, and state management.
+
+## Usage
+
+```bash
+beztack init [options]
+```
+
+<Note>
+  This command must be run from within a Beztack project directory (workspace root).
+</Note>
+
+## Interactive Mode
+
+By default, `init` runs in interactive mode, prompting you to select optional modules:
+
+```bash
+beztack init
+```
+
+You'll see a multi-select prompt with all available optional modules:
+
+```
+? Select the modules you want to include:
+  ◯ Payments - Payment processing (Polar or Mercado Pago)
+  ◯ Email - Email sending with React Email and Resend
+  ◯ AI - AI integration with Vercel AI SDK
+  ◯ OCR - Optical Character Recognition with Tesseract.js
+  ◯ State Management - URL state management with nuqs
+```
+
+If you enable the **Payments** module, you'll be prompted to select a provider:
+
+```
+? Select the payment provider:
+  ◯ Polar - Better Auth checkout + portal workflow
+  ◯ Mercado Pago - Mercado Pago native plans and payment flows
+```
+
+## Non-Interactive Mode
+
+Use flags to configure modules without prompts:
+
+```bash
+beztack init --modules payments,email --payment-provider polar
+```
+
+## Options
+
+<ParamField path="--yes" type="flag">
+  Run in non-interactive mode. When used with `--modules`, applies the specified configuration without prompts.
+  
+  **Alias**: `--non-interactive`
+  
+  ```bash
+  beztack init --yes --modules ai,ocr
+  ```
+</ParamField>
+
+<ParamField path="--modules" type="string">
+  Comma-separated list of optional modules to enable.
+  
+  **Available modules**:
+  - `payments` - Payment processing (requires `--payment-provider`)
+  - `email` - Email sending with React Email and Resend
+  - `ai` - AI integration with Vercel AI SDK
+  - `ocr` - Optical Character Recognition with Tesseract.js
+  - `state` - URL state management with nuqs
+  
+  ```bash
+  beztack init --modules email,ai,ocr
+  ```
+  
+  <Warning>
+    Modules **not** included in the list will be **removed** from your project if they were previously enabled.
+  </Warning>
+</ParamField>
+
+<ParamField path="--payment-provider" type="string">
+  Select the payment provider when enabling the `payments` module.
+  
+  **Valid values**: `polar` | `mercadopago`
+  
+  **Required** when `payments` is in `--modules`
+  
+  ```bash
+  beztack init --modules payments --payment-provider mercadopago
+  ```
+</ParamField>
+
+## Available Modules
+
+### Auth (Required)
+
+Core authentication with Better Auth. This module is always enabled and cannot be removed.
+
+**Includes**:
+- User authentication flows
+- Session management
+- Better Auth integration
+- Auth UI components
+
+### Payments (Optional)
+
+Payment processing with either Polar or Mercado Pago.
+
+**Includes**:
+- Subscription management
+- Payment webhooks
+- Billing UI components
+- Provider-specific integrations
+
+**Requires**: `--payment-provider polar` or `--payment-provider mercadopago`
+
+**Dependencies removed if disabled**:
+- `@polar-sh/sdk`
+- `@polar-sh/better-auth`
+- `@beztack/mercadopago`
+- `@mercadopago/sdk-react`
+- `mercadopago`
+
+### Email (Optional)
+
+Email sending with React Email templates and Resend.
+
+**Includes**:
+- React Email components
+- Resend API integration
+- Email templates
+- Email API routes
+
+**Package**: `@beztack/email`
+
+**Dependencies removed if disabled**:
+- `@beztack/email`
+- `resend`
+- `@react-email/components`
+
+### AI (Optional)
+
+AI integration using the Vercel AI SDK.
+
+**Includes**:
+- AI API routes
+- AI UI components
+- Streaming responses
+- AI utilities
+
+**Package**: `@beztack/ai`
+
+**Dependencies removed if disabled**:
+- `@beztack/ai`
+- `ai`
+
+### OCR (Optional)
+
+Optical Character Recognition with Tesseract.js.
+
+**Includes**:
+- OCR processing API
+- OCR UI components
+- Image text extraction
+
+**Package**: `@beztack/ocr`
+
+**Dependencies removed if disabled**:
+- `@beztack/ocr`
+- `tesseract.js`
+
+### State Management (Optional)
+
+URL-based state management with nuqs.
+
+**Includes**:
+- URL state utilities
+- Type-safe query parameters
+- State management hooks
+
+**Package**: `@beztack/state`
+
+**Dependencies removed if disabled**:
+- `@beztack/state`
+- `nuqs`
+
+## Examples
+
+### Interactive Module Selection
+
+```bash
+beztack init
+```
+
+Prompts you to select modules using arrow keys and spacebar.
+
+### Enable Payments with Polar
+
+```bash
+beztack init --modules payments --payment-provider polar
+```
+
+### Enable Multiple Modules
+
+```bash
+beztack init --modules email,ai,ocr,state
+```
+
+### Enable All Optional Modules
+
+```bash
+beztack init --modules payments,email,ai,ocr,state --payment-provider mercadopago
+```
+
+### Disable All Optional Modules
+
+```bash
+beztack init --modules ""
+```
+
+Leaves only the required `auth` module enabled.
+
+### Switch Payment Provider
+
+To switch from Polar to Mercado Pago:
+
+```bash
+beztack init --modules payments,email --payment-provider mercadopago
+```
+
+This removes Polar-specific files and dependencies, keeping only Mercado Pago integration.
+
+## What Happens During Init
+
+The `init` command performs the following actions:
+
+<Steps>
+  <Step title="Module Removal">
+    Removes files, packages, and dependencies for disabled modules:
+    - Deletes module directories (`packages/*`, `apps/api/server/modules/*`, `apps/ui/src/features/*`)
+    - Removes npm dependencies from `package.json`
+    - Cleans up API routes and UI components
+  </Step>
+  
+  <Step title="Payment Provider Pruning">
+    If payments module is enabled, removes the non-selected provider:
+    - Deletes provider-specific routes and utilities
+    - Updates `.env.example` files with the selected provider
+  </Step>
+  
+  <Step title="Entrypoint Regeneration">
+    Regenerates module entry points and route indexes:
+    - Updates `apps/api/server/routes/index.ts`
+    - Updates module barrel exports
+  </Step>
+  
+  <Step title="Dependency Installation">
+    Runs `pnpm install` to clean up removed dependencies and ensure consistency
+  </Step>
+</Steps>
+
+## Payment Provider Details
+
+<CodeGroup>
+
+```bash Polar
+beztack init --modules payments --payment-provider polar
+```
+
+```bash Mercado Pago
+beztack init --modules payments --payment-provider mercadopago
+```
+
+</CodeGroup>
+
+### Polar
+
+- Better Auth integration
+- Checkout + portal workflow
+- Subscription management
+- Webhook handling for payment events
+
+**Environment Variables** (set in `.env`):
+```bash
+PAYMENT_PROVIDER=polar
+POLAR_ACCESS_TOKEN=your_token
+```
+
+### Mercado Pago
+
+- Native Mercado Pago SDK
+- Latin America payment support
+- Plan and subscription management
+- Webhook handling
+
+**Environment Variables** (set in `.env`):
+```bash
+PAYMENT_PROVIDER=mercadopago
+MERCADOPAGO_ACCESS_TOKEN=your_token
+```
+
+## Error Handling
+
+<Accordion title="Payments module requires payment provider">
+  **Error**: `Payments module requires --payment-provider in non-interactive mode.`
+  
+  **Solution**: Specify `--payment-provider` when enabling payments:
+  ```bash
+  beztack init --modules payments --payment-provider polar
+  ```
+</Accordion>
+
+<Accordion title="Unknown module name">
+  **Error**: `Unknown optional module "xyz". Valid values: payments, email, ai, ocr, state`
+  
+  **Solution**: Use only valid module names:
+  ```bash
+  beztack init --modules payments,email,ai
+  ```
+</Accordion>
+
+<Accordion title="Invalid payment provider">
+  **Error**: `Invalid payment provider "stripe". Use "polar" or "mercadopago".`
+  
+  **Solution**: Use one of the supported providers:
+  ```bash
+  beztack init --modules payments --payment-provider polar
+  ```
+</Accordion>
+
+## Running Init After Project Creation
+
+If you created your project with `--no-init`, you can run `init` later:
+
+```bash
+# Create project without module configuration
+pnpm dlx beztack create --yes --name my-app --no-init
+
+# Navigate to project
+cd my-app
+
+# Configure modules
+beztack init --modules payments,email --payment-provider polar
+```
+
+<Tip>
+  You can run `beztack init` multiple times to reconfigure modules as your project requirements change.
+</Tip>
+
+<Warning>
+  Running `init` will **remove** any modules not specified in the `--modules` list. Make sure to include all modules you want to keep.
+</Warning>

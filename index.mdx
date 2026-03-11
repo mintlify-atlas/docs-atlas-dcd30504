@@ -1,97 +1,111 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Beztack"
+description: "Production-ready TypeScript monorepo starter with modern tools and best practices built-in"
 ---
 
-## Setting up
+<div style={{
+  background: 'linear-gradient(135deg, #f4c05c 0%, #27659a 100%)',
+  borderRadius: '8px',
+  padding: '48px 32px',
+  marginBottom: '32px',
+  color: '#1a1a1a'
+}}>
+  <h1 style={{
+    fontSize: '48px',
+    fontWeight: '700',
+    fontFamily: 'Inter',
+    marginBottom: '16px',
+    color: '#1a1a1a'
+  }}>You want to ship. You need this.</h1>
+  <p style={{
+    fontSize: '20px',
+    fontWeight: '400',
+    fontFamily: 'Inter',
+    marginBottom: '24px',
+    color: '#1a1a1a'
+  }}>Stop wasting time on boilerplate configuration and start building your product with enterprise-grade tooling from day one.</p>
+  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+    <a href="/quickstart" style={{
+      background: '#0a66c2',
+      color: '#ffffff',
+      padding: '12px 24px',
+      borderRadius: '6px',
+      textDecoration: 'none',
+      fontWeight: '600',
+      fontFamily: 'Inter'
+    }}>Get Started</a>
+    <a href="https://github.com/V473r10/beztack" style={{
+      background: '#ffffff',
+      color: '#000000',
+      padding: '12px 24px',
+      borderRadius: '6px',
+      textDecoration: 'none',
+      fontWeight: '600',
+      fontFamily: 'Inter'
+    }}>View on GitHub</a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Quick Start
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Get up and running with Beztack in minutes.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Create your first Beztack project and start building
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation and setup instructions
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Core Features
 
-Everything you need to create world-class documentation.
+Everything you need to build modern TypeScript applications.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={3}>
+  <Card title="NX Monorepo" icon="grid-2" href="/concepts/monorepo">
+    Optimized build system with caching and task orchestration
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="React 19 + Vite" icon="react" href="/apps/ui">
+    Lightning-fast frontend with shadcn/ui components
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Nitro Backend" icon="server" href="/apps/api">
+    Edge-ready server with file-based routing
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Better Auth" icon="lock" href="/guides/authentication">
+    2FA, organizations, and admin roles out of the box
   </Card>
-</Columns>
+  <Card title="Drizzle ORM" icon="database" href="/packages/db">
+    Type-safe database queries with PostgreSQL
+  </Card>
+  <Card title="Payment Integration" icon="credit-card" href="/guides/payments">
+    Polar and Mercado Pago support built-in
+  </Card>
+  <Card title="AI SDK" icon="brain" href="/packages/ai">
+    Vercel AI SDK with Amazon Bedrock integration
+  </Card>
+  <Card title="CLI Tools" icon="terminal" href="/cli/overview">
+    Scaffold projects and manage modules with ease
+  </Card>
+  <Card title="Type Safety" icon="shield-check" href="/packages/env">
+    Environment validation and type-safe configuration
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Explore the Stack
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Apps" icon="window" href="/apps/ui">
+    Frontend, backend, and documentation applications
+  </Card>
+  <Card title="Packages" icon="box" href="/packages/ai">
+    Shared libraries for AI, database, email, and more
+  </Card>
+  <Card title="Guides" icon="book-open" href="/guides/authentication">
+    Learn how to implement key features
+  </Card>
+  <Card title="CLI Reference" icon="code" href="/cli/overview">
+    Command-line tools for project management
+  </Card>
+</CardGroup>

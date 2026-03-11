@@ -1,0 +1,319 @@
+---
+title: beztack create
+description: Create a new Beztack project from the official template
+---
+
+The `beztack create` command scaffolds a new Beztack monorepo project with all core infrastructure and optional modules.
+
+## Usage
+
+```bash
+pnpm dlx beztack create [options]
+```
+
+## Interactive Mode
+
+By default, `create` runs in interactive mode, prompting you to configure:
+
+<Steps>
+  <Step title="Project Name">
+    Enter a project name (lowercase with hyphens, e.g., `my-app`)
+  </Step>
+  <Step title="Project Description">
+    Provide a brief description of your project
+  </Step>
+  <Step title="Git Initialization">
+    Choose whether to initialize a Git repository
+  </Step>
+  <Step title="Dependency Installation">
+    Choose whether to run `pnpm install` automatically
+  </Step>
+  <Step title="Module Configuration">
+    Choose whether to configure optional modules immediately
+  </Step>
+</Steps>
+
+```bash
+pnpm dlx beztack create
+```
+
+## Non-Interactive Mode
+
+Use the `--yes` or `--non-interactive` flag to skip prompts. In this mode, you must provide required options via flags.
+
+```bash
+pnpm dlx beztack create --yes --name my-app
+```
+
+## Options
+
+<ParamField path="--yes" type="flag">
+  Run in non-interactive mode, using defaults or provided flag values.
+  
+  **Alias**: `--non-interactive`
+  
+  <Tip>
+    When using `--yes`, the project name defaults to `my-beztack-app` if not specified with `--name`.
+  </Tip>
+</ParamField>
+
+<ParamField path="--name" type="string">
+  Set the project name. Must be lowercase alphanumeric with hyphens only.
+  
+  **Example**: `my-awesome-app`
+  
+  **Validation**: Must match regex `/^[a-z0-9-]+$/`
+  
+  ```bash
+  beztack create --yes --name my-project
+  ```
+</ParamField>
+
+<ParamField path="--description" type="string">
+  Set the project description. This will be added to the root `package.json`.
+  
+  ```bash
+  beztack create --yes --name my-app --description "My awesome SaaS platform"
+  ```
+</ParamField>
+
+<ParamField path="--git" type="flag">
+  Initialize a Git repository after project creation.
+  
+  **Default**: Enabled in interactive mode, enabled by default in non-interactive mode
+  
+  ```bash
+  beztack create --yes --name my-app --git
+  ```
+</ParamField>
+
+<ParamField path="--no-git" type="flag">
+  Skip Git repository initialization.
+  
+  ```bash
+  beztack create --yes --name my-app --no-git
+  ```
+</ParamField>
+
+<ParamField path="--install" type="flag">
+  Run `pnpm install` to install dependencies after project creation.
+  
+  **Default**: Enabled by default
+  
+  ```bash
+  beztack create --yes --name my-app --install
+  ```
+</ParamField>
+
+<ParamField path="--no-install" type="flag">
+  Skip dependency installation. Useful for faster scaffolding or custom installation workflows.
+  
+  ```bash
+  beztack create --yes --name my-app --no-install
+  ```
+</ParamField>
+
+<ParamField path="--init" type="flag">
+  Configure optional modules immediately after project creation.
+  
+  **Default**: Enabled by default
+  
+  ```bash
+  beztack create --yes --name my-app --init
+  ```
+</ParamField>
+
+<ParamField path="--no-init" type="flag">
+  Skip module configuration. You can run `beztack init` later to configure modules.
+  
+  ```bash
+  beztack create --yes --name my-app --no-init
+  ```
+</ParamField>
+
+<ParamField path="--modules" type="string">
+  Comma-separated list of optional modules to enable. Only valid when using `--init` or when modules are configured.
+  
+  **Available modules**: `payments`, `email`, `ai`, `ocr`, `state`
+  
+  **Example**:
+  ```bash
+  beztack create --yes --name my-app --modules payments,email,ai
+  ```
+  
+  <Note>
+    Required modules (like `auth`) are always included and don't need to be specified.
+  </Note>
+</ParamField>
+
+<ParamField path="--payment-provider" type="string">
+  Select the payment provider when the `payments` module is enabled.
+  
+  **Valid values**: `polar` | `mercadopago`
+  
+  **Required** when `payments` is in `--modules`
+  
+  ```bash
+  beztack create --yes --name my-app --modules payments --payment-provider polar
+  ```
+  
+  <Accordion title="Payment Provider Options">
+    - **polar**: Better Auth checkout + portal workflow with Polar.sh
+    - **mercadopago**: Mercado Pago native plans and payment flows
+  </Accordion>
+</ParamField>
+
+<ParamField path="--template-source" type="string">
+  Custom template source (local path or Git URL). Useful for using a forked template or local development.
+  
+  **Default**: `https://github.com/V473r10/beztack.git`
+  
+  ```bash
+  # Use local template
+  beztack create --yes --name my-app --template-source ../beztack
+  
+  # Use custom Git repository
+  beztack create --yes --name my-app --template-source https://github.com/myorg/beztack-fork.git
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Interactive Creation
+
+```bash
+pnpm dlx beztack create
+```
+
+You'll be prompted for all configuration options.
+
+### Quick Start with Defaults
+
+```bash
+pnpm dlx beztack create --yes --name my-app
+```
+
+Creates a project named `my-app` with:
+- Git initialized
+- Dependencies installed
+- Modules configured (interactive selection)
+
+### Full Non-Interactive Setup
+
+```bash
+pnpm dlx beztack create --yes \
+  --name my-saas \
+  --description "My SaaS platform" \
+  --modules payments,email,ai \
+  --payment-provider mercadopago
+```
+
+### Minimal Setup (No Install, No Git)
+
+```bash
+pnpm dlx beztack create --yes \
+  --name my-app \
+  --no-git \
+  --no-install \
+  --no-init
+```
+
+Scaffolds the project structure only, skipping all post-creation steps.
+
+### Custom Template Source
+
+```bash
+pnpm dlx beztack create --yes \
+  --name my-app \
+  --template-source ../beztack
+```
+
+Useful for:
+- Testing local template changes
+- Using a forked/customized template
+- Offline development
+
+## What Gets Created
+
+The `create` command generates a complete monorepo structure:
+
+```
+my-app/
+├── apps/
+│   ├── api/          # Nitro backend with h3
+│   ├── ui/           # React 19 + Vite frontend
+│   └── docs/         # Next.js documentation site
+├── packages/
+│   ├── cli/          # Beztack CLI (this tool)
+│   ├── env/          # Environment variable validation
+│   └── [modules]/    # Optional: ai, email, ocr, state
+├── package.json      # Workspace configuration
+├── nx.json          # Nx configuration
+└── pnpm-workspace.yaml
+```
+
+## Next Steps
+
+After creating your project:
+
+<Steps>
+  <Step title="Navigate to Project">
+    ```bash
+    cd my-app
+    ```
+  </Step>
+  
+  <Step title="Configure Environment Variables">
+    ```bash
+    cp apps/api/.env.example apps/api/.env
+    cp apps/ui/.env.example apps/ui/.env
+    cp apps/docs/.env.example apps/docs/.env
+    # Edit .env files with your configuration
+    ```
+  </Step>
+  
+  <Step title="Push Database Schema">
+    ```bash
+    pnpm run push
+    ```
+  </Step>
+  
+  <Step title="Start Development Servers">
+    ```bash
+    pnpm run dev
+    ```
+  </Step>
+</Steps>
+
+## Error Handling
+
+<Accordion title="Invalid project name">
+  **Error**: `Invalid project name "MyApp": Project name must be lowercase with hyphens`
+  
+  **Solution**: Use lowercase alphanumeric characters and hyphens only:
+  ```bash
+  beztack create --yes --name my-app
+  ```
+</Accordion>
+
+<Accordion title="Missing payment provider">
+  **Error**: `Payments module requires --payment-provider (polar or mercadopago)`
+  
+  **Solution**: Specify a payment provider when using the payments module:
+  ```bash
+  beztack create --yes --name my-app --modules payments --payment-provider polar
+  ```
+</Accordion>
+
+<Accordion title="Missing project name in non-interactive mode">
+  **Error**: `Missing project name for non-interactive create. Use "--name <project-name>" or "--yes".`
+  
+  **Solution**: Either provide `--name` or use `--yes` without other flags to use defaults:
+  ```bash
+  beztack create --yes --name my-project
+  ```
+</Accordion>
+
+<Note>
+  The `create` command clones the official Beztack template, applies your configuration, and sets up the project workspace. All template files are tracked for future synchronization via `beztack template` commands.
+</Note>

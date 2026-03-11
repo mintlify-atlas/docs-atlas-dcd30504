@@ -1,0 +1,484 @@
+---
+title: "@beztack/state"
+description: "Type-safe URL state management with nuqs"
+---
+
+# State Package
+
+The `@beztack/state` package provides type-safe URL state management using nuqs. It allows you to sync component state with URL search parameters, enabling shareable links and browser navigation support.
+
+## Installation
+
+The state package is optional. Add it during project creation:
+
+```bash Terminal
+pnpm dlx beztack init --modules state
+```
+
+Or install manually:
+
+```bash Terminal
+pnpm add @beztack/state --filter @beztack/ui
+```
+
+## What's Included
+
+<CardGroup cols={2}>
+  <Card title="nuqs" icon="link">
+    Complete re-export of nuqs for URL state management
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Type-safe parsers for strings, numbers, booleans, arrays, and JSON
+  </Card>
+  <Card title="React Hooks" icon="react">
+    Hooks API similar to useState
+  </Card>
+  <Card title="Next.js Support" icon="n">
+    Adapters for Next.js App Router and Pages Router
+  </Card>
+</CardGroup>
+
+## Exports
+
+### Core Hooks
+
+```typescript
+import {
+  useQueryState,
+  useQueryStates,
+  parseAsString,
+  parseAsInteger,
+  parseAsBoolean,
+  parseAsArrayOf,
+  parseAsJson,
+} from "@beztack/state"
+```
+
+### Type Parsers
+
+<ResponseField name="parseAsString" type="ParserBuilder<string>">
+  Parse as string value
+</ResponseField>
+
+<ResponseField name="parseAsInteger" type="ParserBuilder<number>">
+  Parse as integer (validates numeric input)
+</ResponseField>
+
+<ResponseField name="parseAsFloat" type="ParserBuilder<number>">
+  Parse as floating-point number
+</ResponseField>
+
+<ResponseField name="parseAsBoolean" type="ParserBuilder<boolean>">
+  Parse as boolean (`true`/`false`)
+</ResponseField>
+
+<ResponseField name="parseAsStringEnum" type="function">
+  Parse as string enum with allowed values
+  
+  ```typescript
+  parseAsStringEnum(["option1", "option2"])
+  ```
+</ResponseField>
+
+<ResponseField name="parseAsArrayOf" type="function">
+  Parse as array with custom parser
+  
+  ```typescript
+  parseAsArrayOf(parseAsInteger)
+  ```
+</ResponseField>
+
+<ResponseField name="parseAsJson" type="ParserBuilder<T>">
+  Parse as JSON with Zod schema validation
+</ResponseField>
+
+<ResponseField name="parseAsIsoDateTime" type="ParserBuilder<Date>">
+  Parse as ISO 8601 datetime
+</ResponseField>
+
+<ResponseField name="parseAsTimestamp" type="ParserBuilder<Date>">
+  Parse as Unix timestamp
+</ResponseField>
+
+### Next.js Adapters
+
+```typescript
+import { NuqsAdapter } from "@beztack/state/adapters/next"
+```
+
+## Usage Examples
+
+### Basic String State
+
+```typescript Component
+import { useQueryState, parseAsString } from "@beztack/state"
+
+function SearchBox() {
+  const [search, setSearch] = useQueryState(
+    "q",
+    parseAsString.withDefault("")
+  )
+
+  return (
+    <input
+      type="text"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search..."
+    />
+  )
+}
+
+// URL: ?q=hello
+```
+
+### Number State
+
+```typescript Pagination
+import { useQueryState, parseAsInteger } from "@beztack/state"
+
+function Pagination() {
+  const [page, setPage] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1)
+  )
+
+  return (
+    <div>
+      <button type="button" onClick={() => setPage(page - 1)}>Previous</button>
+      <span>Page {page}</span>
+      <button type="button" onClick={() => setPage(page + 1)}>Next</button>
+    </div>
+  )
+}
+
+// URL: ?page=3
+```
+
+### Boolean State
+
+```typescript Toggle
+import { useQueryState, parseAsBoolean } from "@beztack/state"
+
+function FilterPanel() {
+  const [showFilters, setShowFilters] = useQueryState(
+    "filters",
+    parseAsBoolean.withDefault(false)
+  )
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setShowFilters(!showFilters)}
+      >
+        Toggle Filters
+      </button>
+      {showFilters && <div>Filter options...</div>}
+    </div>
+  )
+}
+
+// URL: ?filters=true
+```
+
+### Enum State
+
+```typescript Select
+import { useQueryState, parseAsStringEnum } from "@beztack/state"
+
+function SortSelector() {
+  const [sort, setSort] = useQueryState(
+    "sort",
+    parseAsStringEnum(["name", "date", "price"] as const).withDefault("name")
+  )
+
+  return (
+    <select value={sort} onChange={(e) => setSort(e.target.value)}>
+      <option value="name">Name</option>
+      <option value="date">Date</option>
+      <option value="price">Price</option>
+    </select>
+  )
+}
+
+// URL: ?sort=date
+```
+
+### Array State
+
+```typescript Multi-select
+import { useQueryState, parseAsArrayOf, parseAsString } from "@beztack/state"
+
+function TagFilter() {
+  const [tags, setTags] = useQueryState(
+    "tags",
+    parseAsArrayOf(parseAsString).withDefault([])
+  )
+
+  const toggleTag = (tag: string) => {
+    setTags(
+      tags.includes(tag)
+        ? tags.filter((t) => t !== tag)
+        : [...tags, tag]
+    )
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={() => toggleTag("react")}>React</button>
+      <button type="button" onClick={() => toggleTag("typescript")}>TypeScript</button>
+      <button type="button" onClick={() => toggleTag("vite")}>Vite</button>
+      <p>Selected: {tags.join(", ")}</p>
+    </div>
+  )
+}
+
+// URL: ?tags=react&tags=typescript
+```
+
+### Multiple States
+
+```typescript useQueryStates
+import { useQueryStates, parseAsString, parseAsInteger } from "@beztack/state"
+
+function ProductList() {
+  const [filters, setFilters] = useQueryStates({
+    search: parseAsString.withDefault(""),
+    category: parseAsString.withDefault("all"),
+    page: parseAsInteger.withDefault(1),
+    limit: parseAsInteger.withDefault(10),
+  })
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={filters.search}
+        onChange={(e) => setFilters({ search: e.target.value })}
+      />
+      <select
+        value={filters.category}
+        onChange={(e) => setFilters({ category: e.target.value })}
+      >
+        <option value="all">All</option>
+        <option value="electronics">Electronics</option>
+      </select>
+      <p>
+        Page {filters.page} of {Math.ceil(100 / filters.limit)}
+      </p>
+    </div>
+  )
+}
+
+// URL: ?search=laptop&category=electronics&page=2&limit=20
+```
+
+### JSON State with Validation
+
+```typescript Complex State
+import { useQueryState, parseAsJson } from "@beztack/state"
+import { z } from "zod"
+
+const filterSchema = z.object({
+  minPrice: z.number(),
+  maxPrice: z.number(),
+  inStock: z.boolean(),
+})
+
+type Filters = z.infer<typeof filterSchema>
+
+function AdvancedFilters() {
+  const [filters, setFilters] = useQueryState(
+    "filters",
+    parseAsJson(filterSchema.parse).withDefault({
+      minPrice: 0,
+      maxPrice: 1000,
+      inStock: false,
+    })
+  )
+
+  return (
+    <div>
+      <input
+        type="number"
+        value={filters.minPrice}
+        onChange={(e) =>
+          setFilters({ ...filters, minPrice: Number(e.target.value) })
+        }
+      />
+      <input
+        type="checkbox"
+        checked={filters.inStock}
+        onChange={(e) =>
+          setFilters({ ...filters, inStock: e.target.checked })
+        }
+      />
+    </div>
+  )
+}
+
+// URL: ?filters={"minPrice":50,"maxPrice":500,"inStock":true}
+```
+
+## Next.js Integration
+
+### App Router Setup
+
+Wrap your app with the adapter:
+
+```tsx app/layout.tsx
+import { NuqsAdapter } from "@beztack/state/adapters/next/app"
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <NuqsAdapter>{children}</NuqsAdapter>
+      </body>
+    </html>
+  )
+}
+```
+
+### Server-Side Usage
+
+```typescript Server Component
+import { createSearchParamsCache } from "@beztack/state/server"
+import { parseAsString, parseAsInteger } from "@beztack/state"
+import type { SearchParams } from "@beztack/state/server"
+
+const searchParamsCache = createSearchParamsCache({
+  q: parseAsString.withDefault(""),
+  page: parseAsInteger.withDefault(1),
+})
+
+type PageProps = {
+  searchParams: Promise<SearchParams>
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const { q, page } = await searchParamsCache.parse(searchParams)
+
+  return (
+    <div>
+      <h1>Search: {q}</h1>
+      <p>Page {page}</p>
+    </div>
+  )
+}
+```
+
+## API Reference
+
+### `useQueryState()`
+
+```typescript Signature
+function useQueryState<T>(
+  key: string,
+  parser?: Parser<T>,
+  options?: UseQueryStateOptions
+): [T, (value: T | null) => void]
+```
+
+<ParamField path="key" type="string" required>
+  URL parameter name
+</ParamField>
+
+<ParamField path="parser" type="Parser<T>">
+  Value parser with default
+</ParamField>
+
+<ParamField path="options" type="object">
+  - `history`: `"push"` | `"replace"` (default: `"push"`)
+  - `shallow`: Skip re-render on change
+  - `scroll`: Scroll to top on change
+  - `throttleMs`: Throttle state updates
+</ParamField>
+
+### `useQueryStates()`
+
+```typescript Signature
+function useQueryStates<T extends Record<string, Parser<any>>>(
+  parsers: T,
+  options?: UseQueryStatesOptions
+): [Values<T>, (updates: Partial<Values<T>>) => void]
+```
+
+Manage multiple query parameters at once.
+
+## Type Definitions
+
+The package re-exports all nuqs types:
+
+```typescript Source (packages/state/src/index.ts:10-54)
+export type {
+  inferParserType,
+  Options,
+  Parser,
+  ParserBuilder,
+  UseQueryStateOptions,
+  UseQueryStatesOptions,
+} from "nuqs"
+
+export {
+  createParser,
+  createSerializer,
+  parseAsArrayOf,
+  parseAsBoolean,
+  parseAsFloat,
+  parseAsHex,
+  parseAsInteger,
+  parseAsIsoDateTime,
+  parseAsJson,
+  parseAsNumberLiteral,
+  parseAsString,
+  parseAsStringEnum,
+  parseAsStringLiteral,
+  parseAsTimestamp,
+  useQueryState,
+  useQueryStates,
+} from "nuqs"
+```
+
+## Benefits
+
+<CardGroup cols={2}>
+  <Card title="Shareable URLs" icon="share">
+    State is encoded in URL - users can share links with filters/pagination
+  </Card>
+  <Card title="Browser Navigation" icon="arrow-left">
+    Back/forward buttons work with state changes
+  </Card>
+  <Card title="Deep Linking" icon="link">
+    Link directly to filtered/paginated views
+  </Card>
+  <Card title="SSR Compatible" icon="server">
+    Read initial state on server for SEO
+  </Card>
+</CardGroup>
+
+## Dependencies
+
+- `nuqs` ^2.8.4 - URL state management library
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="nuqs Docs" icon="book" href="https://nuqs.dev/docs">
+    Official nuqs documentation
+  </Card>
+  <Card title="Examples" icon="code" href="https://nuqs.dev/docs/examples">
+    nuqs usage examples
+  </Card>
+  <Card title="State Management Guide" icon="link" href="/concepts/state">
+    State management in Beztack
+  </Card>
+  <Card title="Next.js Integration" icon="n" href="https://nuqs.dev/docs/adapters/next">
+    Using with Next.js
+  </Card>
+</CardGroup>

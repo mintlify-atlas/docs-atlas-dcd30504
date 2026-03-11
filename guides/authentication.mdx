@@ -1,0 +1,379 @@
+---
+title: Authentication
+description: Set up and configure authentication with Better Auth, including 2FA, organizations, and protected routes
+---
+
+Beztack uses [Better Auth](https://better-auth.com) for authentication with support for email/password, OAuth providers, two-factor authentication, and organization management.
+
+## Authentication Setup
+
+The authentication system is pre-configured in `apps/api/server/utils/auth.ts`:
+
+```typescript apps/api/server/utils/auth.ts
+import { betterAuth } from "better-auth"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { admin, organization, twoFactor } from "better-auth/plugins"
+import { db, schema } from "@beztack/db"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: "pg", schema }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
+  plugins: [
+    twoFactor({ issuer: env.APP_NAME }),
+    admin(),
+    organization({
+      requireEmailVerificationOnInvitation: false,
+      teams: {
+        enabled: true,
+        maximumTeams: 50,
+      },
+    }),
+  ],
+})
+```
+
+## Environment Variables
+
+Configure these variables in your `.env` file:
+
+```bash .env
+BETTER_AUTH_SECRET="your-secret-key-min-32-chars"
+BETTER_AUTH_URL="http://localhost:3000"
+APP_NAME="beztack"
+```
+
+<Warning>
+  Generate a secure `BETTER_AUTH_SECRET` using: `openssl rand -base64 32`
+</Warning>
+
+## Database Schema
+
+Better Auth uses these tables (defined in `packages/db/src/schema.ts`):
+
+```typescript packages/db/src/schema.ts
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+})
+
+export const session = pgTable("session", {
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  token: text("token").notNull().unique(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  activeOrganizationId: text("active_organization_id"),
+})
+```
+
+## Implementing Two-Factor Authentication
+
+Two-factor authentication (2FA) uses TOTP (Time-based One-Time Password).
+
+### Enable 2FA for a User
+
+<Steps>
+
+<Step title="Generate TOTP Secret">
+  Better Auth automatically generates a secret when enabling 2FA:
+
+  ```typescript
+  // Client-side: Enable 2FA
+  const { data } = await authClient.twoFactor.enable({
+    password: userPassword,
+  })
+
+  // data.totpUri - QR code URI for authenticator apps
+  // data.backupCodes - One-time backup codes
+  ```
+</Step>
+
+<Step title="Verify TOTP Code">
+  User scans QR code and enters the code to verify:
+
+  ```typescript
+  await authClient.twoFactor.verify({
+    code: totpCode,
+  })
+  ```
+</Step>
+
+<Step title="Sign In with 2FA">
+  After email/password, prompt for TOTP code:
+
+  ```typescript apps/ui/src/app/auth/sign-in/two-factor/two-factor.tsx
+  const handleSubmit = async (code: string) => {
+    await authClient.signIn.twoFactor({
+      code,
+    })
+    navigate("/dashboard")
+  }
+  ```
+</Step>
+
+</Steps>
+
+### Database Schema for 2FA
+
+```typescript packages/db/src/schema.ts
+export const twoFactor = pgTable("two_factor", {
+  id: text("id").primaryKey(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+})
+```
+
+## Organizations and Teams
+
+Beztack supports multi-tenant organizations with team management.
+
+### Organization Schema
+
+```typescript packages/db/src/schema.ts
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+})
+
+export const member = pgTable("member", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  role: text("role").default("member").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+```
+
+### Create Organization
+
+```typescript
+const { data } = await authClient.organization.create({
+  name: "Acme Corp",
+  slug: "acme-corp",
+})
+```
+
+### Invite Members
+
+```typescript
+await authClient.organization.inviteMember({
+  organizationId: org.id,
+  email: "user@example.com",
+  role: "member", // or "admin", "owner"
+})
+```
+
+### Admin Roles
+
+The admin plugin adds role-based access control:
+
+```typescript
+// Check if user is admin
+const session = await auth.api.getSession({ headers })
+const isAdmin = session?.user.role === "admin"
+
+// Assign admin role
+await authClient.admin.setRole({
+  userId: "user-id",
+  role: "admin",
+})
+```
+
+## Session Management
+
+### Get Current Session
+
+```typescript
+// Client-side
+import { authClient } from "@/lib/auth-client"
+
+const session = await authClient.getSession()
+if (session) {
+  console.log(session.user.email)
+}
+```
+
+### Server-side Session Check
+
+```typescript apps/api/server/routes/api/protected.ts
+import { auth } from "server/utils/auth"
+import { defineEventHandler, createError } from "h3"
+
+export default defineEventHandler(async (event) => {
+  const session = await auth.api.getSession({
+    headers: event.headers,
+  })
+
+  if (!session) {
+    throw createError({
+      statusCode: 401,
+      message: "Unauthorized",
+    })
+  }
+
+  return { user: session.user }
+})
+```
+
+### Sign Out
+
+```typescript
+await authClient.signOut()
+```
+
+## Protected Routes
+
+Protect routes in the frontend using React Router:
+
+```typescript apps/ui/src/components/protected-route.tsx
+import { Navigate } from "react-router"
+import { useAuth } from "@/hooks/use-auth"
+
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { session, isLoading } = useAuth()
+
+  if (isLoading) {
+    return <div>Loading...</div>
+  }
+
+  if (!session) {
+    return <Navigate to="/auth/sign-in" replace />
+  }
+
+  return children
+}
+```
+
+Usage in routes:
+
+```typescript apps/ui/src/features/auth/routes.tsx
+import { ProtectedRoute } from "@/components/protected-route"
+
+export const AppRoutes: RouteObject[] = [
+  {
+    path: "dashboard",
+    element: (
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    ),
+  },
+]
+```
+
+## API Routes
+
+Better Auth automatically creates these endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/sign-in/email` | POST | Email/password sign in |
+| `/api/auth/sign-up/email` | POST | Email/password sign up |
+| `/api/auth/sign-out` | POST | Sign out |
+| `/api/auth/session` | GET | Get current session |
+| `/api/auth/two-factor/enable` | POST | Enable 2FA |
+| `/api/auth/two-factor/verify` | POST | Verify 2FA code |
+| `/api/auth/organization/create` | POST | Create organization |
+| `/api/auth/organization/invite` | POST | Invite member |
+
+See the [Better Auth documentation](https://better-auth.com) for the complete API reference.
+
+## OAuth Providers
+
+Add OAuth providers in `apps/api/server/utils/auth.ts`:
+
+```typescript
+export const auth = betterAuth({
+  socialProviders: {
+    github: {
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    },
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    },
+  },
+})
+```
+
+Then add the provider buttons in your sign-in form:
+
+```typescript
+<button
+  type="button"
+  onClick={() => authClient.signIn.social({ provider: "github" })}
+>
+  Sign in with GitHub
+</button>
+```
+
+<Info>
+  OAuth providers require callback URLs to be configured. For local development, use `http://localhost:3000/api/auth/callback/github`
+</Info>
+
+## Email Notifications
+
+Beztack sends welcome emails on sign-up using the email hook:
+
+```typescript apps/api/server/utils/auth.ts
+import { sendEmail } from "@beztack/email"
+import { createAuthMiddleware } from "better-auth/plugins"
+
+export const auth = betterAuth({
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path.includes("/sign-up")) {
+        const newSession = ctx.context.newSession
+        if (newSession) {
+          await sendEmail({
+            type: "welcome",
+            to: newSession.user.email,
+            data: { username: newSession.user.name },
+          })
+        }
+      }
+    }),
+  },
+})
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database" href="/guides/database">
+    Learn about database schema and migrations
+  </Card>
+  <Card title="Payments" href="/guides/payments">
+    Integrate subscription payments
+  </Card>
+</CardGroup>

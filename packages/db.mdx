@@ -1,0 +1,364 @@
+---
+title: "@beztack/db"
+description: "Database client and schema with Drizzle ORM"
+---
+
+# Database Package
+
+The `@beztack/db` package provides a type-safe database client using Drizzle ORM with PostgreSQL. It includes pre-configured tables for authentication, organizations, teams, and payment providers.
+
+## Installation
+
+The database package is required and included by default:
+
+```bash Terminal
+pnpm add @beztack/db --filter @beztack/api
+```
+
+## Exports
+
+### Database Client
+
+```typescript
+import { db } from "@beztack/db"
+```
+
+<ParamField path="db" type="DrizzleInstance">
+  Pre-configured Drizzle database client connected to PostgreSQL
+  
+  Uses `DATABASE_URL` environment variable from `@beztack/env/api`
+</ParamField>
+
+### Schema Tables
+
+All table definitions are exported:
+
+```typescript
+import {
+  user,
+  session,
+  account,
+  verification,
+  twoFactor,
+  organization,
+  member,
+  invitation,
+  team,
+  teamMember,
+  mpPlan,
+  mpSubscription,
+  mpPayment,
+  mpInvoice,
+  // ... and more
+} from "@beztack/db"
+```
+
+### Schema Object
+
+```typescript
+import { schema } from "@beztack/db"
+```
+
+<ParamField path="schema" type="object">
+  Complete schema object containing all table definitions, required by Better Auth Drizzle adapter
+</ParamField>
+
+## Core Tables
+
+### Authentication Tables
+
+Better Auth tables for user management:
+
+<CardGroup cols={2}>
+  <Card title="user" icon="user">
+    User accounts with email, verification, 2FA, roles, and subscription cache
+  </Card>
+  <Card title="session" icon="key">
+    User sessions with tokens, expiration, IP tracking, and impersonation
+  </Card>
+  <Card title="account" icon="link">
+    OAuth provider accounts linked to users
+  </Card>
+  <Card title="verification" icon="envelope-circle-check">
+    Email verification and password reset tokens
+  </Card>
+  <Card title="twoFactor" icon="shield">
+    TOTP secrets and backup codes for 2FA
+  </Card>
+</CardGroup>
+
+### Organization Tables
+
+<CardGroup cols={2}>
+  <Card title="organization" icon="building">
+    Organizations with slug, logo, subscription cache, and metadata
+  </Card>
+  <Card title="member" icon="users">
+    Organization members with roles
+  </Card>
+  <Card title="invitation" icon="envelope">
+    Organization invitations with expiration
+  </Card>
+  <Card title="team" icon="people-group">
+    Teams within organizations
+  </Card>
+  <Card title="teamMember" icon="user-plus">
+    Team membership relationships
+  </Card>
+</CardGroup>
+
+### Payment Tables (Mercado Pago)
+
+<CardGroup cols={2}>
+  <Card title="mpPlan" icon="tag">
+    Mercado Pago subscription plans with pricing and features
+  </Card>
+  <Card title="mpSubscription" icon="repeat">
+    Active subscriptions with billing cycles
+  </Card>
+  <Card title="mpPayment" icon="credit-card">
+    Payment transactions and status
+  </Card>
+  <Card title="mpInvoice" icon="file-invoice">
+    Invoice records for subscription billing
+  </Card>
+  <Card title="mpRefund" icon="rotate-left">
+    Refund tracking
+  </Card>
+  <Card title="mpChargeback" icon="ban">
+    Chargeback disputes
+  </Card>
+  <Card title="mpWebhookLog" icon="webhook">
+    Webhook event logs for debugging
+  </Card>
+</CardGroup>
+
+## Usage Examples
+
+### Query Users
+
+```typescript Example
+import { db, user } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+// Find user by email
+const users = await db
+  .select()
+  .from(user)
+  .where(eq(user.email, "user@example.com"))
+
+const foundUser = users[0]
+```
+
+### Insert Organization
+
+```typescript Create
+import { db, organization } from "@beztack/db"
+
+const [newOrg] = await db
+  .insert(organization)
+  .values({
+    id: crypto.randomUUID(),
+    name: "Acme Corp",
+    slug: "acme-corp",
+  })
+  .returning()
+
+console.log(newOrg.id)
+```
+
+### Join Tables
+
+```typescript Relations
+import { db, organization, member, user } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+// Get organization members with user details
+const members = await db
+  .select({
+    userId: user.id,
+    userName: user.name,
+    userEmail: user.email,
+    role: member.role,
+    orgName: organization.name,
+  })
+  .from(member)
+  .innerJoin(user, eq(member.userId, user.id))
+  .innerJoin(organization, eq(member.organizationId, organization.id))
+  .where(eq(organization.slug, "acme-corp"))
+```
+
+### Transactions
+
+```typescript Atomic Operations
+import { db, user, organization, member } from "@beztack/db"
+
+await db.transaction(async (tx) => {
+  // Create organization
+  const [org] = await tx
+    .insert(organization)
+    .values({
+      id: crypto.randomUUID(),
+      name: "New Company",
+      slug: "new-company",
+    })
+    .returning()
+
+  // Add user as owner
+  await tx.insert(member).values({
+    id: crypto.randomUUID(),
+    organizationId: org.id,
+    userId: "user-id",
+    role: "owner",
+  })
+})
+```
+
+## Schema Definition
+
+### User Table
+
+```typescript Schema (packages/db/src/schema.ts:14-35)
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
+  // Subscription cache (denormalized)
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+  subscriptionId: text("subscription_id"),
+  subscriptionValidUntil: timestamp("subscription_valid_until"),
+})
+```
+
+### Organization Table
+
+```typescript Schema (packages/db/src/schema.ts:122-142)
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+  metadata: text("metadata"),
+  // Subscription cache
+  subscriptionTier: text("subscription_tier"),
+  subscriptionStatus: text("subscription_status"),
+  subscriptionId: text("subscription_id"),
+  subscriptionValidUntil: timestamp("subscription_valid_until"),
+  polarCustomerId: text("polar_customer_id"),
+  usageMetrics: text("usage_metrics"),
+  billingManagedByRole: text("billing_managed_by_role").default("owner"),
+})
+```
+
+## Database Commands
+
+The package includes scripts for database management:
+
+### Generate and Apply Migrations
+
+```bash Terminal
+pnpm migrate
+```
+
+Generates migration files from schema changes and applies them to the database.
+
+### Push Schema Directly
+
+```bash Terminal
+pnpm push
+```
+
+Pushes schema changes directly to the database without creating migration files (useful for development).
+
+<Warning>
+  Use `pnpm push` only in development. For production, always use migrations with `pnpm migrate`.
+</Warning>
+
+### Generate Auth Schema
+
+```bash Terminal
+pnpm generate-auth-schema
+```
+
+Regenerates Better Auth schema types from auth configuration.
+
+## Configuration
+
+Database connection is configured via environment variables:
+
+```typescript Source (packages/db/src/client.ts:1-8)
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
+import { env } from "@beztack/env/api"
+
+const connectionString = env.DATABASE_URL
+const client = postgres(connectionString)
+export const db = drizzle({ client })
+```
+
+Required environment variable:
+
+```bash .env
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+```
+
+## Type Safety
+
+Drizzle provides full TypeScript type inference:
+
+```typescript Type Inference
+import { db, user } from "@beztack/db"
+
+const users = await db.select().from(user)
+// users: Array<{
+//   id: string
+//   name: string
+//   email: string
+//   emailVerified: boolean
+//   ...
+// }>
+
+const userEmail: string = users[0].email // ✅ Type-safe
+```
+
+## Dependencies
+
+- `drizzle-orm` ^0.44.7 - Type-safe ORM
+- `postgres` ^3.4.7 - PostgreSQL client
+- `drizzle-kit` ^0.31.8 - Migration toolkit
+- `@beztack/env` - Environment configuration
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Drizzle ORM Docs" icon="book" href="https://orm.drizzle.team/docs/overview">
+    Official Drizzle documentation
+  </Card>
+  <Card title="PostgreSQL" icon="database" href="https://www.postgresql.org/docs/">
+    PostgreSQL documentation
+  </Card>
+  <Card title="Database Guide" icon="server" href="/guides/database">
+    Database setup and usage
+  </Card>
+  <Card title="Migrations" icon="code-branch" href="/guides/database">
+    Managing schema changes
+  </Card>
+</CardGroup>

@@ -1,0 +1,516 @@
+---
+title: "Module System"
+description: "Beztack's modular architecture lets you include only what you need - from auth to payments to AI"
+---
+
+Beztack is designed with modularity at its core. When creating a new project, you can choose which features to include, keeping your codebase lean and focused.
+
+## Overview
+
+The module system allows you to:
+
+- Include only the features your project needs
+- Remove unused code and dependencies
+- Choose between different payment providers
+- Customize your stack during project initialization
+
+<Info>
+Modules are configured during project creation with `pnpm create beztack`. The CLI removes unwanted modules, dependencies, and files automatically.
+</Info>
+
+## Module Categories
+
+Beztack modules fall into two categories:
+
+<CardGroup cols={2}>
+  <Card title="Required Modules" icon="lock">
+    Core functionality that every Beztack project needs. Cannot be disabled.
+  </Card>
+  <Card title="Optional Modules" icon="toggle-on">
+    Features you can opt into based on your project requirements.
+  </Card>
+</CardGroup>
+
+## Available Modules
+
+### Auth (Required)
+
+**Status:** Always included
+
+**Description:** Core authentication powered by Better Auth with support for:
+- Email/password authentication
+- Two-factor authentication (2FA)
+- Organization management
+- Admin roles and permissions
+- Session management
+
+**Included in:**
+- `apps/api/server/modules/auth/`
+- `apps/api/server/routes/api/auth/`
+- `apps/ui/src/features/auth/`
+- `apps/ui/src/app/auth/`
+
+**Dependencies:**
+- `better-auth`
+- `@better-auth/drizzle`
+
+<Note>
+Auth is required because it's deeply integrated into Beztack's architecture. User management is fundamental to most applications.
+</Note>
+
+### Payments (Optional)
+
+**Status:** Optional with provider choice
+
+**Description:** Payment processing and subscription management with your choice of provider:
+- **Polar**: Modern payment infrastructure for SaaS (recommended)
+- **Mercado Pago**: Latin America payment processing
+
+**Included in:**
+- `apps/api/server/modules/payments/`
+- `apps/api/server/routes/api/subscriptions/`
+- `apps/api/server/routes/api/polar/` (if Polar chosen)
+- `apps/api/server/routes/api/payments/mercado-pago/` (if Mercado Pago chosen)
+- `apps/ui/src/features/payments/`
+- `apps/ui/src/app/billing/`
+
+**Dependencies:**
+```json
+// Polar provider
+"@polar-sh/sdk"
+"@polar-sh/better-auth"
+
+// Mercado Pago provider  
+"@beztack/mercadopago"
+"@mercadopago/sdk-react"
+"mercadopago"
+```
+
+<Tip>
+Choose **Polar** for modern SaaS with subscriptions, usage-based billing, and developer-friendly webhooks. Choose **Mercado Pago** if your primary market is Latin America.
+</Tip>
+
+### Email (Optional)
+
+**Status:** Optional
+
+**Description:** Email sending with React Email templates and Resend delivery:
+- Beautiful, responsive email templates
+- Type-safe template props
+- Preview emails in development
+- Transactional email sending via Resend
+
+**Package:** `packages/email/`
+
+**Included in:**
+- `apps/api/server/modules/email/`
+- `apps/api/server/routes/api/email/`
+
+**Dependencies:**
+```json
+"@beztack/email"
+"@react-email/components"
+"resend"
+```
+
+**Example templates:**
+- Welcome emails
+- Password reset
+- Email verification
+- Account notifications
+
+### AI (Optional)
+
+**Status:** Optional
+
+**Description:** AI integration powered by Vercel AI SDK with Amazon Bedrock:
+- Text generation and streaming
+- Tool calling (function calling)
+- Structured output with Zod schemas
+- Multi-modal capabilities (text + images)
+
+**Package:** `packages/ai/`
+
+**Included in:**
+- `apps/api/server/modules/ai/`
+- `apps/ui/src/features/ai/`
+- `apps/ui/src/app/ai/`
+
+**Dependencies:**
+```json
+"@beztack/ai"
+"ai"  // Vercel AI SDK
+```
+
+**Example use cases:**
+- Chat interfaces
+- Content generation
+- Data extraction from documents
+- Intelligent form assistance
+
+### OCR (Optional)
+
+**Status:** Optional
+
+**Description:** Optical Character Recognition using Tesseract.js:
+- Extract text from images
+- Support for 100+ languages
+- Client-side and server-side processing
+- PDF text extraction
+
+**Package:** `packages/ocr/`
+
+**Included in:**
+- `apps/api/server/modules/ocr/`
+- `apps/ui/src/features/ocr/`
+- `apps/ui/src/app/ocr/`
+
+**Dependencies:**
+```json
+"@beztack/ocr"
+"tesseract.js"
+```
+
+### State Management (Optional)
+
+**Status:** Optional
+
+**Description:** URL state management with nuqs:
+- Type-safe URL search params
+- Automatic parsing and serialization
+- React hooks for URL state
+- Shareable URLs with application state
+
+**Package:** `packages/state/`
+
+**Included in:**
+- `apps/ui/src/features/state/`
+- `apps/ui/src/app/examples/nuqs-demo.tsx`
+
+**Dependencies:**
+```json
+"@beztack/state"
+"nuqs"
+```
+
+**Example use case:**
+```typescript
+import { useQueryState } from "nuqs"
+
+function SearchPage() {
+	const [search, setSearch] = useQueryState("q")
+	// URL: /search?q=typescript
+	// search === "typescript"
+}
+```
+
+## Module Structure
+
+Each module follows a consistent structure defined in `packages/cli/src/modules.ts`:
+
+```typescript
+export interface ModuleDefinition {
+	name: string                // 'auth', 'payments', etc.
+	label: string               // User-friendly name for CLI
+	description?: string        // Short description
+	required: boolean           // Can it be disabled?
+	packageDir?: string         // Package to remove if disabled
+	npmDeps?: string[]          // NPM dependencies to remove
+	nxProjects?: string[]       // Affected NX projects
+	fileGlobs?: string[]        // Files to delete when disabled
+	codemods?: string[]         // Code transformations to apply
+	hasApiModule?: boolean      // Has server-side code?
+	hasUiFeature?: boolean      // Has frontend code?
+}
+```
+
+### Module Locations
+
+When a module is enabled, it may include:
+
+1. **Backend module:** `apps/api/server/modules/{name}/`
+2. **API routes:** `apps/api/server/routes/api/{name}/`
+3. **Frontend feature:** `apps/ui/src/features/{name}/`
+4. **App pages:** `apps/ui/src/app/{name}/`
+5. **Shared package:** `packages/{name}/`
+
+## Project Initialization
+
+During `pnpm create beztack`, the CLI guides you through module selection:
+
+```bash
+pnpm create beztack my-app
+```
+
+<Steps>
+  <Step title="Choose Modules">
+    Select which optional modules to include:
+    ```
+    ? Select features to include:
+    ◉ Payments
+    ◯ Email  
+    ◉ AI
+    ◯ OCR
+    ◉ State Management
+    ```
+  </Step>
+  
+  <Step title="Choose Payment Provider" skip="If payments not selected">
+    If you selected payments, choose a provider:
+    ```
+    ? Select payment provider:
+    ❯ Polar (recommended for SaaS)
+      Mercado Pago (Latin America)
+    ```
+  </Step>
+  
+  <Step title="Remove Disabled Modules">
+    The CLI removes:
+    - Unused packages from `packages/`
+    - NPM dependencies from `package.json` files
+    - Module directories and files
+    - Import statements (via codemods)
+  </Step>
+  
+  <Step title="Regenerate Entry Points">
+    Auto-generates:
+    - API route index files
+    - Module barrel exports
+    - TypeScript path mappings
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Runs `pnpm install` to sync dependencies.
+  </Step>
+</Steps>
+
+## Configuration Example
+
+Here's how modules are defined in `packages/cli/src/modules.ts`:
+
+```typescript
+export const modules: ModuleDefinition[] = [
+	{
+		name: "auth",
+		label: "Auth (required)",
+		description: "Core authentication with Better Auth",
+		required: true,
+		nxProjects: ["api", "ui"],
+		hasApiModule: true,
+		hasUiFeature: true,
+		fileGlobs: [
+			"apps/api/server/modules/auth/**/*",
+			"apps/api/server/routes/api/auth/**/*",
+			"apps/ui/src/features/auth/**/*",
+		],
+	},
+	{
+		name: "payments",
+		label: "Payments",
+		description: "Payment processing (Polar or Mercado Pago)",
+		required: false,
+		nxProjects: ["api", "ui"],
+		hasApiModule: true,
+		hasUiFeature: true,
+		npmDeps: [
+			"@polar-sh/sdk",
+			"@polar-sh/better-auth",
+			"@beztack/mercadopago",
+			"@mercadopago/sdk-react",
+			"mercadopago",
+		],
+		fileGlobs: [
+			"apps/api/server/modules/payments/**/*",
+			"apps/api/server/routes/api/subscriptions/**/*",
+			"apps/ui/src/features/payments/**/*",
+		],
+		codemods: ["remove-payments-imports"],
+	},
+	// ... other modules
+]
+```
+
+## Payment Provider Selection
+
+When payments module is enabled, you must choose a provider:
+
+```typescript
+export interface InitProjectConfig {
+	enabledModules: string[]
+	paymentProvider?: "polar" | "mercadopago"
+}
+```
+
+### Provider Pruning
+
+The CLI removes unused provider code:
+
+```typescript
+const PROVIDER_PRUNE_CONFIG = {
+	polar: {
+		fileGlobs: ["apps/api/server/routes/api/payments/mercado-pago/**/*"],
+	},
+	mercadopago: {
+		fileGlobs: ["apps/api/server/routes/api/polar/**/*"],
+	},
+}
+```
+
+### Environment Configuration
+
+The provider choice updates `.env.example` files:
+
+```bash
+# If Polar selected
+PAYMENT_PROVIDER=polar
+VITE_PAYMENT_PROVIDER=polar
+POLAR_ACCESS_TOKEN=polar_...
+
+# If Mercado Pago selected  
+PAYMENT_PROVIDER=mercadopago
+VITE_PAYMENT_PROVIDER=mercadopago
+MERCADO_PAGO_ACCESS_TOKEN=...
+```
+
+## Module Removal Process
+
+When a module is disabled during initialization (`packages/cli/src/init-project.ts`):
+
+<Steps>
+  <Step title="Delete Package Directory">
+    Remove `packages/{module}/` if `packageDir` is specified.
+  </Step>
+  
+  <Step title="Delete Files by Glob">
+    Remove all files matching `fileGlobs` patterns:
+    ```typescript
+    for (const pattern of module.fileGlobs) {
+      const files = await glob(pattern, { cwd: workspaceRoot })
+      for (const file of files) {
+        await rm(join(workspaceRoot, file), { recursive: true })
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Remove NPM Dependencies">
+    Remove dependencies from affected `package.json` files:
+    ```typescript
+    for (const dep of module.npmDeps) {
+      // Remove from dependencies and devDependencies
+    }
+    ```
+  </Step>
+  
+  <Step title="Run Codemods">
+    Execute code transformations to remove imports and references:
+    ```typescript
+    for (const codemod of module.codemods) {
+      await runCodemod(codemod)
+    }
+    ```
+  </Step>
+  
+  <Step title="Regenerate Entry Points">
+    Update generated files:
+    - API route indexes
+    - Module barrel exports
+    - TypeScript configurations
+  </Step>
+</Steps>
+
+## Customizing Modules Post-Init
+
+<Warning>
+Modules should be configured during project initialization. Manually adding/removing modules after setup requires careful dependency management.
+</Warning>
+
+If you need to add a module after initialization:
+
+1. **Copy module files** from a fresh Beztack installation
+2. **Install dependencies** with `pnpm add`
+3. **Update imports** in your code
+4. **Regenerate entry points** if needed
+
+If you need to remove a module:
+
+1. **Delete module directories** from `apps/api` and `apps/ui`
+2. **Remove dependencies** with `pnpm remove`
+3. **Remove imports** from your code
+4. **Test thoroughly** to ensure no broken references
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Lean" icon="minimize">
+    Only enable modules you know you'll need. It's easier to add later than remove.
+  </Card>
+  <Card title="Review Dependencies" icon="magnifying-glass">
+    Check what dependencies each module adds before enabling it.
+  </Card>
+  <Card title="Use TypeScript" icon="shield">
+    TypeScript will catch broken imports if you manually remove a module.
+  </Card>
+  <Card title="Test After Changes" icon="vial">
+    Always run `pnpm build` and `pnpm test` after module changes.
+  </Card>
+</CardGroup>
+
+## Example: Minimal Setup
+
+For a simple app without payments, AI, or advanced features:
+
+```bash
+pnpm create beztack my-simple-app
+
+# Select modules:
+# ◯ Payments - NO
+# ◯ Email - NO  
+# ◯ AI - NO
+# ◯ OCR - NO
+# ◯ State Management - NO
+```
+
+**Result:**
+- Auth (required)
+- Database (via `@beztack/db`)
+- Environment validation (via `@beztack/env`)
+
+**Packages removed:**
+- `packages/ai/`
+- `packages/email/`
+- `packages/ocr/`
+- `packages/state/`
+
+## Example: Full-Featured SaaS
+
+For a complete SaaS application:
+
+```bash
+pnpm create beztack my-saas
+
+# Select modules:
+# ◉ Payments - YES (choose Polar)
+# ◉ Email - YES
+# ◉ AI - YES
+# ◯ OCR - NO
+# ◉ State Management - YES
+```
+
+**Result:**
+- Full authentication with organizations
+- Polar payment integration
+- Email sending with React Email
+- AI features with Vercel AI SDK
+- URL state management
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how modules fit into the overall architecture
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Create your first Beztack project
+  </Card>
+</CardGroup>

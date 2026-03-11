@@ -1,0 +1,482 @@
+---
+title: API Server
+description: Nitro-powered backend with file-based routing, Drizzle ORM, Better Auth, and edge-ready deployment
+---
+
+The API server is built with **Nitro** (powered by h3), providing a fast, portable, and edge-ready backend that works everywhere from serverless to Node.js to Deno.
+
+## Architecture
+
+The API uses **file-based routing** where each file in `server/routes/` becomes an API endpoint. Nitro handles the routing, middleware, and deployment optimization automatically.
+
+<CardGroup cols={2}>
+  <Card title="Framework" icon="rocket">
+    Nitro with h3 for universal, portable server runtime
+  </Card>
+  <Card title="Database" icon="database">
+    PostgreSQL with Drizzle ORM for type-safe queries
+  </Card>
+  <Card title="Authentication" icon="lock">
+    Better Auth with 2FA, Organizations, and Admin roles
+  </Card>
+  <Card title="Payments" icon="credit-card">
+    Polar and MercadoPago integrations with webhooks
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+### Core Dependencies
+
+```json
+{
+  "nitropack": "^2.12.9",
+  "h3": "^1.15.4",
+  "better-auth": "^1.4.6",
+  "drizzle-orm": "^0.44.7",
+  "postgres": "^3.4.7"
+}
+```
+
+### Key Features
+
+- **Nitro** - Universal JavaScript server with edge deployment
+- **h3** - Minimal, high-performance HTTP framework
+- **Drizzle ORM** - Type-safe SQL query builder
+- **Better Auth** - Modern authentication with social providers, 2FA, and organizations
+- **Zod** - Runtime schema validation
+- **Polar SDK** - Payment processing and subscriptions
+
+### Workspace Packages
+
+```typescript
+"@beztack/db"    // Database schema and client
+"@beztack/email" // Email templates
+"@beztack/env"   // Environment validation
+```
+
+## File-Based Routing
+
+Nitro automatically creates routes from files in `server/routes/`. The file name determines the HTTP method and path:
+
+```
+server/routes/
+├── index.ts                    → GET  /
+├── api/
+│   ├── auth/
+│   │   └── [...].ts           → *    /api/auth/*
+│   ├── admin/
+│   │   ├── analytics.get.ts   → GET  /api/admin/analytics
+│   │   └── metrics.ts         → *    /api/admin/metrics
+│   ├── membership/
+│   │   ├── status.get.ts      → GET  /api/membership/status
+│   │   └── user.get.ts        → GET  /api/membership/user
+│   ├── payments/
+│   │   ├── mercado-pago/
+│   │   │   ├── webhook.post.ts           → POST /api/payments/mercado-pago/webhook
+│   │   │   ├── preference.post.ts        → POST /api/payments/mercado-pago/preference
+│   │   │   └── subscriptions/
+│   │   │       ├── index.post.ts         → POST /api/payments/mercado-pago/subscriptions
+│   │   │       ├── [id].get.ts           → GET  /api/payments/mercado-pago/subscriptions/:id
+│   │   │       └── plans/
+│   │   │           ├── index.get.ts      → GET  /api/payments/mercado-pago/subscriptions/plans
+│   │   │           └── sync.post.ts      → POST /api/payments/mercado-pago/subscriptions/plans/sync
+│   │   └── polar/
+│   │       ├── checkout.post.ts          → POST /api/payments/polar/checkout
+│   │       ├── webhooks.post.ts          → POST /api/payments/polar/webhooks
+│   │       └── products/
+│   │           └── index.get.ts          → GET  /api/payments/polar/products
+│   ├── subscriptions/
+│   │   ├── index.get.ts       → GET  /api/subscriptions
+│   │   ├── checkout.post.ts   → POST /api/subscriptions/checkout
+│   │   ├── [id].get.ts        → GET  /api/subscriptions/:id
+│   │   └── [id].patch.ts      → PATCH /api/subscriptions/:id
+│   └── email/
+│       ├── welcome.post.ts              → POST /api/email/welcome
+│       └── password-reset.post.ts       → POST /api/email/password-reset
+```
+
+<Info>
+  Files with `.get.ts`, `.post.ts`, `.patch.ts`, `.delete.ts` suffixes automatically map to HTTP methods.
+</Info>
+
+## API Route Examples
+
+### Basic Route Handler
+
+```typescript title="server/routes/api/membership/status.get.ts"
+import { defineEventHandler } from "h3"
+import { requireUser } from "@/server/utils/membership"
+
+export default defineEventHandler(async (event) => {
+  const user = await requireUser(event)
+  
+  return {
+    success: true,
+    data: {
+      userId: user.user.id,
+      membership: user.membership,
+    },
+  }
+})
+```
+
+### Route with Validation
+
+```typescript title="server/routes/api/email/welcome.post.ts"
+import { defineEventHandler, readBody, createError } from "h3"
+import { z } from "zod"
+import { sendEmail } from "@beztack/email"
+
+const schema = z.object({
+  email: z.string().email(),
+  username: z.string(),
+})
+
+export default defineEventHandler(async (event) => {
+  try {
+    const body = await readBody(event)
+    const data = schema.parse(body)
+    
+    await sendEmail({
+      type: "welcome",
+      to: data.email,
+      data: { username: data.username },
+    })
+    
+    return { success: true }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw createError({
+        statusCode: 400,
+        message: "Invalid input",
+      })
+    }
+    throw error
+  }
+})
+```
+
+### Protected Route (Pro Membership)
+
+```typescript title="server/routes/api/admin/analytics.get.ts"
+import { defineEventHandler } from "h3"
+import { requirePro } from "@/server/utils/membership"
+
+export default defineEventHandler(async (event) => {
+  // Require Pro membership for analytics access
+  const user = await requirePro(event)
+  
+  const analyticsData = {
+    users: { total: 1250, active: 892, new: 45 },
+    revenue: { monthly: 15_750, yearly: 189_000, growth: 12.5 },
+    subscriptions: { active: 324, canceled: 12 },
+  }
+  
+  return {
+    success: true,
+    data: {
+      analytics: analyticsData,
+      user: { id: user.user.id, membership: user.membership },
+    },
+  }
+})
+```
+
+### Dynamic Route Parameters
+
+```typescript title="server/routes/api/subscriptions/[id].get.ts"
+import { defineEventHandler, getRouterParam } from "h3"
+import { db } from "@beztack/db"
+
+export default defineEventHandler(async (event) => {
+  const id = getRouterParam(event, "id")
+  
+  const subscription = await db.query.subscriptions.findFirst({
+    where: (s, { eq }) => eq(s.id, id),
+  })
+  
+  if (!subscription) {
+    throw createError({
+      statusCode: 404,
+      message: "Subscription not found",
+    })
+  }
+  
+  return { success: true, data: subscription }
+})
+```
+
+## Database Integration
+
+### Drizzle ORM
+
+The API uses **Drizzle ORM** for type-safe database queries:
+
+```typescript
+import { db, schema } from "@beztack/db"
+import { eq } from "drizzle-orm"
+
+// Query users
+const users = await db.query.user.findMany({
+  where: eq(schema.user.emailVerified, true),
+  limit: 10,
+})
+
+// Insert user
+const [newUser] = await db.insert(schema.user).values({
+  email: "user@example.com",
+  name: "John Doe",
+}).returning()
+
+// Update user
+await db.update(schema.user)
+  .set({ emailVerified: true })
+  .where(eq(schema.user.id, userId))
+```
+
+### Database Schema
+
+The schema is defined in `@beztack/db` package using Drizzle:
+
+```typescript title="packages/db/schema.ts"
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core"
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+})
+```
+
+## Better Auth Configuration
+
+Authentication is powered by **Better Auth** with comprehensive features:
+
+```typescript title="server/utils/auth.ts"
+import { betterAuth } from "better-auth"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { admin, organization, twoFactor } from "better-auth/plugins"
+import { db, schema } from "@beztack/db"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: "pg", schema }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
+  plugins: [
+    twoFactor({ issuer: "Beztack" }),
+    admin(),
+    organization({
+      requireEmailVerificationOnInvitation: false,
+      async sendInvitationEmail(data) {
+        await sendEmail({
+          type: "organization-invitation",
+          to: data.email,
+          data: {
+            organizationName: data.organization.name,
+            invitationUrl: `${baseUrl}/accept-invitation/${data.id}`,
+          },
+        })
+      },
+    }),
+  ],
+})
+```
+
+### Authentication Plugins
+
+<Steps>
+  <Step title="Two-Factor Authentication">
+    TOTP-based 2FA with QR code enrollment and backup codes
+  </Step>
+  <Step title="Admin Roles">
+    Role-based access control with admin privileges
+  </Step>
+  <Step title="Organizations">
+    Multi-tenancy with organizations, teams, and invitations
+  </Step>
+  <Step title="Polar Integration">
+    Automatic customer creation and subscription management
+  </Step>
+</Steps>
+
+### Catch-All Auth Route
+
+Better Auth uses a catch-all route for all authentication endpoints:
+
+```typescript title="server/routes/api/auth/[...].ts"
+import { defineEventHandler, toWebRequest } from "h3"
+import { auth } from "server/utils/auth"
+
+export default defineEventHandler((event) => {
+  return auth.handler(toWebRequest(event))
+})
+```
+
+This handles:
+- `POST /api/auth/sign-in`
+- `POST /api/auth/sign-up`
+- `POST /api/auth/sign-out`
+- `GET /api/auth/session`
+- `POST /api/auth/two-factor/enable`
+- And 20+ more auth endpoints
+
+## Environment Variables
+
+Environment validation is handled by `@beztack/env` package:
+
+```bash title=".env"
+# Database
+DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+
+# Better Auth
+BETTER_AUTH_SECRET="your-secret-key"
+BETTER_AUTH_URL="http://localhost:3001"
+
+# Polar Payments
+PAYMENT_PROVIDER="polar"
+POLAR_ACCESS_TOKEN="polar_..."
+POLAR_WEBHOOK_SECRET="whsec_..."
+POLAR_SUCCESS_URL="http://localhost:5173/checkout-success"
+
+# Email
+RESEND_API_KEY="re_..."
+
+# App
+APP_NAME="beztack"
+NODE_ENV="development"
+```
+
+<Warning>
+  Never commit `.env` files to version control. Use `.env.example` as a template.
+</Warning>
+
+## Development
+
+### Running the API Server
+
+```bash
+# Start API only
+nx dev api
+
+# Or start all apps
+pnpm dev
+```
+
+The API server runs on **http://localhost:3001** with hot reload enabled.
+
+### Database Migrations
+
+```bash
+# Generate migration from schema changes
+pnpm migrate
+
+# Push schema changes directly (dev only)
+pnpm push
+```
+
+### Testing API Endpoints
+
+Use curl, Postman, or any HTTP client:
+
+```bash
+# Get session
+curl http://localhost:3001/api/auth/session \
+  -H "Cookie: better-auth.session_token=..."
+
+# Sign in
+curl -X POST http://localhost:3001/api/auth/sign-in \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password"}'
+
+# Get membership status
+curl http://localhost:3001/api/membership/status \
+  -H "Cookie: better-auth.session_token=..."
+```
+
+## Nitro Configuration
+
+The API is configured via `nitro.config.ts`:
+
+```typescript title="apps/api/nitro.config.ts"
+import { defineNitroConfig } from "nitropack/config"
+
+export default defineNitroConfig({
+  srcDir: "server",
+  compatibilityDate: "latest",
+  experimental: {
+    openAPI: true, // Auto-generate OpenAPI docs
+  },
+  devServer: {
+    watch: ["server/**/*"],
+  },
+  externals: {
+    inline: [
+      "@polar-sh/sdk",
+      "better-auth",
+      "zod",
+    ],
+  },
+})
+```
+
+### OpenAPI Documentation
+
+With `experimental.openAPI` enabled, Nitro generates OpenAPI specs automatically:
+
+```bash
+# View OpenAPI schema
+curl http://localhost:3001/_nitro/openapi.json
+```
+
+## Deployment
+
+Nitro supports multiple deployment targets:
+
+<CardGroup cols={2}>
+  <Card title="Vercel" icon="triangle">
+    Serverless deployment with automatic preset
+  </Card>
+  <Card title="Cloudflare Workers" icon="cloud">
+    Edge deployment with global distribution
+  </Card>
+  <Card title="Node.js" icon="node-js">
+    Traditional server with PM2 or Docker
+  </Card>
+  <Card title="AWS Lambda" icon="aws">
+    Serverless with API Gateway integration
+  </Card>
+</CardGroup>
+
+### Building for Production
+
+```bash
+# Build API
+nx build api
+
+# Output is in apps/api/.output/
+node apps/api/.output/server/index.mjs
+```
+
+### Vercel Deployment
+
+Nitro automatically detects Vercel and uses the correct preset:
+
+```json title="vercel.json"
+{
+  "buildCommand": "nx build api",
+  "outputDirectory": "apps/api/.output"
+}
+```
+
+<Tip>
+  Nitro's universal runtime means you can deploy to any platform without code changes.
+</Tip>

@@ -1,0 +1,141 @@
+---
+title: CLI Overview
+description: Introduction to the Beztack CLI for creating and managing monorepo projects
+---
+
+The Beztack CLI is a command-line tool for scaffolding and managing production-ready TypeScript monorepo projects. It provides commands for project creation, module configuration, and template synchronization.
+
+## Installation
+
+Run Beztack directly using `pnpm dlx` (recommended):
+
+```bash
+pnpm dlx beztack create
+```
+
+Or install globally:
+
+```bash
+pnpm add -g beztack
+```
+
+## Available Commands
+
+The Beztack CLI provides four main commands:
+
+<CardGroup cols={2}>
+  <Card title="create" icon="plus" href="/cli/create">
+    Create a new Beztack project from the template
+  </Card>
+  <Card title="init" icon="wrench" href="/cli/init">
+    Configure modules in an existing project
+  </Card>
+  <Card title="template" icon="arrows-rotate" href="/cli/template">
+    Manage template synchronization and updates
+  </Card>
+  <Card title="help" icon="circle-question">
+    Display help information and available commands
+  </Card>
+</CardGroup>
+
+## Usage
+
+```bash
+beztack <command> [options]
+```
+
+## Global Options
+
+These options work across all commands:
+
+<ParamField path="--debug" type="flag">
+  Enable debug mode to show detailed command outputs for troubleshooting.
+  
+  Short form: `-d`
+</ParamField>
+
+<ParamField path="--help" type="flag">
+  Display help information for the CLI or a specific command.
+  
+  Short form: `-h`
+</ParamField>
+
+<ParamField path="--refresh" type="flag">
+  Force template cache refresh before running template commands. Only applies to `template` subcommands.
+</ParamField>
+
+<ParamField path="--offline" type="flag">
+  Use only local template cache for template commands. Only applies to `template` subcommands.
+</ParamField>
+
+## Template Commands Options
+
+The following options apply specifically to `beztack template` commands:
+
+<ParamField path="--host" type="string" default="127.0.0.1">
+  Host address for the `template inspect` development server.
+</ParamField>
+
+<ParamField path="--port" type="number" default="3434">
+  Port number for the `template inspect` development server.
+</ParamField>
+
+## Common Workflows
+
+### Creating a New Project
+
+```bash
+# Interactive mode (recommended for first-time users)
+pnpm dlx beztack create
+
+# Non-interactive with all options specified
+pnpm dlx beztack create --yes --name my-app --modules payments,ai --payment-provider polar
+```
+
+### Configuring Modules
+
+```bash
+# Interactive module selection
+beztack init
+
+# Non-interactive with specific modules
+beztack init --modules email,ocr
+```
+
+### Checking Template Status
+
+```bash
+# Check for available template updates
+beztack template status
+
+# Force refresh the template cache
+beztack template status --refresh
+```
+
+## Exit Codes
+
+- `0` - Success
+- `1` - Error (invalid arguments, command failure, user cancellation)
+
+## Environment
+
+The Beztack CLI requires:
+
+- **Node.js**: >= 18.0.0
+- **Package Manager**: pnpm (recommended), npm, or yarn
+- **Git**: Required for project creation and template synchronization
+
+## Getting Help
+
+```bash
+# Show general help
+beztack --help
+
+# Show help for a specific command
+beztack create --help
+beztack template --help
+```
+
+<Note>
+  All Beztack CLI commands support both interactive and non-interactive modes. Use the `--yes` or `--non-interactive` flag to skip prompts.
+</Note>

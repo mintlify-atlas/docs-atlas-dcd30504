@@ -1,0 +1,481 @@
+---
+title: "@beztack/state"
+description: "Type-safe URL state management with nuqs parsers and utilities"
+---
+
+The `@beztack/state` package provides centralized state management utilities, currently focused on type-safe URL search params management using [nuqs](https://nuqs.dev/).
+
+## Installation
+
+```bash
+pnpm add @beztack/state
+```
+
+## Overview
+
+This package re-exports the entire nuqs library, providing:
+- Type-safe URL search parameter parsing
+- React hooks for reading and writing URL state
+- Server-side search params utilities
+- Built-in parsers for common data types
+
+## Core Hooks
+
+### useQueryState
+
+Manage a single URL search parameter with type safety.
+
+```typescript
+import { useQueryState, parseAsString } from "@beztack/state"
+
+function SearchBox() {
+  const [search, setSearch] = useQueryState("q", parseAsString.withDefault(""))
+
+  return (
+    <input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search..."
+    />
+  )
+}
+```
+
+<ParamField path="useQueryState" type="function">
+  Hook for managing a single URL search parameter.
+  
+  ```typescript
+  function useQueryState<T>(
+    key: string,
+    parser?: Parser<T>,
+    options?: UseQueryStateOptions
+  ): [T | null, (value: T | null) => void]
+  ```
+</ParamField>
+
+### useQueryStates
+
+Manage multiple URL search parameters simultaneously.
+
+```typescript
+import { useQueryStates, parseAsString, parseAsInteger } from "@beztack/state"
+
+function ProductFilter() {
+  const [filters, setFilters] = useQueryStates({
+    category: parseAsString,
+    minPrice: parseAsInteger,
+    maxPrice: parseAsInteger,
+  })
+
+  return (
+    <div>
+      <input
+        value={filters.category ?? ""}
+        onChange={(e) => setFilters({ category: e.target.value })}
+      />
+      <input
+        type="number"
+        value={filters.minPrice ?? ""}
+        onChange={(e) => setFilters({ minPrice: parseInt(e.target.value) })}
+      />
+    </div>
+  )
+}
+```
+
+<ParamField path="useQueryStates" type="function">
+  Hook for managing multiple URL search parameters.
+  
+  ```typescript
+  function useQueryStates<T extends Record<string, Parser>>(
+    parsers: T,
+    options?: UseQueryStatesOptions
+  ): [ParsedValues<T>, (updates: Partial<ParsedValues<T>>) => void]
+  ```
+</ParamField>
+
+## Built-in Parsers
+
+### String Parsers
+
+<Accordion title="parseAsString">
+```typescript
+import { parseAsString } from "@beztack/state"
+
+const [name, setName] = useQueryState("name", parseAsString)
+// URL: ?name=john → name = "john"
+// URL: (no param) → name = null
+
+// With default value
+const [name, setName] = useQueryState("name", parseAsString.withDefault("guest"))
+// URL: (no param) → name = "guest"
+```
+</Accordion>
+
+<Accordion title="parseAsStringEnum">
+```typescript
+import { parseAsStringEnum } from "@beztack/state"
+
+const [sort, setSort] = useQueryState(
+  "sort",
+  parseAsStringEnum(["asc", "desc"] as const)
+)
+// URL: ?sort=asc → sort = "asc"
+// URL: ?sort=invalid → sort = null (invalid values are rejected)
+```
+</Accordion>
+
+<Accordion title="parseAsStringLiteral">
+```typescript
+import { parseAsStringLiteral } from "@beztack/state"
+
+type View = "grid" | "list"
+const [view, setView] = useQueryState(
+  "view",
+  parseAsStringLiteral<View>(["grid", "list"])
+)
+```
+</Accordion>
+
+### Number Parsers
+
+<Accordion title="parseAsInteger">
+```typescript
+import { parseAsInteger } from "@beztack/state"
+
+const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1))
+// URL: ?page=5 → page = 5
+// URL: ?page=invalid → page = 1 (default)
+// URL: ?page=3.14 → page = 3 (truncated)
+```
+</Accordion>
+
+<Accordion title="parseAsFloat">
+```typescript
+import { parseAsFloat } from "@beztack/state"
+
+const [price, setPrice] = useQueryState("price", parseAsFloat)
+// URL: ?price=29.99 → price = 29.99
+// URL: ?price=30 → price = 30
+```
+</Accordion>
+
+<Accordion title="parseAsNumberLiteral">
+```typescript
+import { parseAsNumberLiteral } from "@beztack/state"
+
+const [rating, setRating] = useQueryState(
+  "rating",
+  parseAsNumberLiteral([1, 2, 3, 4, 5] as const)
+)
+// URL: ?rating=5 → rating = 5
+// URL: ?rating=6 → rating = null (not in allowed values)
+```
+</Accordion>
+
+### Boolean Parser
+
+<Accordion title="parseAsBoolean">
+```typescript
+import { parseAsBoolean } from "@beztack/state"
+
+const [isOpen, setIsOpen] = useQueryState("open", parseAsBoolean.withDefault(false))
+// URL: ?open=true → isOpen = true
+// URL: ?open=1 → isOpen = true
+// URL: ?open=false → isOpen = false
+// URL: (no param) → isOpen = false (default)
+```
+</Accordion>
+
+### Date/Time Parsers
+
+<Accordion title="parseAsIsoDateTime">
+```typescript
+import { parseAsIsoDateTime } from "@beztack/state"
+
+const [createdAt, setCreatedAt] = useQueryState("created", parseAsIsoDateTime)
+// URL: ?created=2024-01-15T10:30:00Z → createdAt = Date object
+```
+</Accordion>
+
+<Accordion title="parseAsTimestamp">
+```typescript
+import { parseAsTimestamp } from "@beztack/state"
+
+const [timestamp, setTimestamp] = useQueryState("ts", parseAsTimestamp)
+// URL: ?ts=1705318200000 → timestamp = Date object
+```
+</Accordion>
+
+### Advanced Parsers
+
+<Accordion title="parseAsJson">
+```typescript
+import { parseAsJson } from "@beztack/state"
+import { z } from "zod"
+
+const filterSchema = z.object({
+  tags: z.array(z.string()),
+  minPrice: z.number(),
+})
+
+const [filters, setFilters] = useQueryState(
+  "filters",
+  parseAsJson(filterSchema.parse)
+)
+// URL: ?filters={"tags":["sale"],"minPrice":10}
+```
+</Accordion>
+
+<Accordion title="parseAsArrayOf">
+```typescript
+import { parseAsArrayOf, parseAsString, parseAsInteger } from "@beztack/state"
+
+// Array of strings
+const [tags, setTags] = useQueryState("tags", parseAsArrayOf(parseAsString))
+// URL: ?tags=typescript&tags=react → tags = ["typescript", "react"]
+
+// Array of numbers
+const [ids, setIds] = useQueryState("ids", parseAsArrayOf(parseAsInteger))
+// URL: ?ids=1&ids=2&ids=3 → ids = [1, 2, 3]
+```
+</Accordion>
+
+<Accordion title="parseAsHex">
+```typescript
+import { parseAsHex } from "@beztack/state"
+
+const [color, setColor] = useQueryState("color", parseAsHex.withDefault("#000000"))
+// URL: ?color=#ff5733 → color = "#ff5733"
+```
+</Accordion>
+
+## Custom Parsers
+
+Create custom parsers for your specific data types:
+
+```typescript
+import { createParser } from "@beztack/state"
+
+const parseAsCoordinates = createParser({
+  parse: (value: string) => {
+    const [lat, lng] = value.split(",").map(Number)
+    if (isNaN(lat) || isNaN(lng)) return null
+    return { lat, lng }
+  },
+  serialize: (value: { lat: number; lng: number }) => `${value.lat},${value.lng}`,
+})
+
+function MapView() {
+  const [coords, setCoords] = useQueryState(
+    "location",
+    parseAsCoordinates.withDefault({ lat: 0, lng: 0 })
+  )
+
+  return <div>Latitude: {coords.lat}, Longitude: {coords.lng}</div>
+}
+```
+
+<ParamField path="createParser" type="function">
+  Create a custom parser with parse and serialize functions.
+  
+  ```typescript
+  function createParser<T>({
+    parse: (value: string) => T | null,
+    serialize: (value: T) => string,
+  }): Parser<T>
+  ```
+</ParamField>
+
+## Server-Side Usage
+
+Use search params parsers in server components and API routes:
+
+```typescript
+import {
+  createSearchParamsCache,
+  serverParseAsString,
+  serverParseAsInteger,
+} from "@beztack/state"
+
+// Define search params schema
+const searchParamsCache = createSearchParamsCache({
+  q: serverParseAsString.withDefault(""),
+  page: serverParseAsInteger.withDefault(1),
+  category: serverParseAsString,
+})
+
+// In Next.js server component
+export default function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>
+}) {
+  const { q, page, category } = searchParamsCache.parse(searchParams)
+
+  // Fetch products using parsed params
+  const products = await fetchProducts({ q, page, category })
+
+  return <div>{/* render products */}</div>
+}
+```
+
+<ParamField path="createSearchParamsCache" type="function">
+  Create a server-side search params parser with caching.
+  
+  ```typescript
+  function createSearchParamsCache<T extends Record<string, Parser>>(
+    parsers: T
+  ): {
+    parse: (searchParams: SearchParams) => ParsedValues<T>
+  }
+  ```
+</ParamField>
+
+## Options
+
+### History Mode
+
+Control how URL updates affect browser history:
+
+```typescript
+import { useQueryState, parseAsString } from "@beztack/state"
+
+function SearchBox() {
+  const [search, setSearch] = useQueryState(
+    "q",
+    parseAsString,
+    { history: "replace" } // Don't add to history stack
+  )
+
+  return <input value={search ?? ""} onChange={(e) => setSearch(e.target.value)} />
+}
+```
+
+<ParamField path="options.history" type="'push' | 'replace'">
+  - `push` (default): Add new entry to browser history
+  - `replace`: Replace current history entry
+</ParamField>
+
+### Shallow Routing
+
+```typescript
+const [state, setState] = useQueryState(
+  "key",
+  parseAsString,
+  { shallow: true } // Don't trigger full page re-render
+)
+```
+
+### Scroll Restoration
+
+```typescript
+const [page, setPage] = useQueryState(
+  "page",
+  parseAsInteger,
+  { scroll: false } // Don't scroll to top on change
+)
+```
+
+## Type Inference
+
+Full TypeScript type inference for parser types:
+
+```typescript
+import type { inferParserType } from "@beztack/state"
+import { parseAsInteger, parseAsStringEnum } from "@beztack/state"
+
+// Infer type from parser
+type PageNumber = inferParserType<typeof parseAsInteger> // number | null
+
+const sortParser = parseAsStringEnum(["asc", "desc"] as const)
+type SortOrder = inferParserType<typeof sortParser> // "asc" | "desc" | null
+```
+
+## Usage Examples
+
+### Pagination
+
+```typescript
+import { useQueryState, parseAsInteger } from "@beztack/state"
+
+function Pagination() {
+  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1))
+
+  return (
+    <div>
+      <button onClick={() => setPage(page - 1)} disabled={page <= 1}>
+        Previous
+      </button>
+      <span>Page {page}</span>
+      <button onClick={() => setPage(page + 1)}>Next</button>
+    </div>
+  )
+}
+```
+
+### Search and Filters
+
+```typescript
+import { useQueryStates, parseAsString, parseAsArrayOf } from "@beztack/state"
+
+function ProductSearch() {
+  const [filters, setFilters] = useQueryStates({
+    q: parseAsString.withDefault(""),
+    category: parseAsString,
+    tags: parseAsArrayOf(parseAsString),
+  })
+
+  return (
+    <div>
+      <input
+        value={filters.q}
+        onChange={(e) => setFilters({ q: e.target.value })}
+        placeholder="Search products..."
+      />
+      <select
+        value={filters.category ?? ""}
+        onChange={(e) => setFilters({ category: e.target.value })}
+      >
+        <option value="">All Categories</option>
+        <option value="electronics">Electronics</option>
+        <option value="clothing">Clothing</option>
+      </select>
+    </div>
+  )
+}
+```
+
+### Tabs with URL State
+
+```typescript
+import { useQueryState, parseAsStringEnum } from "@beztack/state"
+
+function TabPanel() {
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringEnum(["overview", "settings", "billing"] as const).withDefault("overview")
+  )
+
+  return (
+    <div>
+      <nav>
+        <button onClick={() => setTab("overview")}>Overview</button>
+        <button onClick={() => setTab("settings")}>Settings</button>
+        <button onClick={() => setTab("billing")}>Billing</button>
+      </nav>
+      <div>
+        {tab === "overview" && <OverviewTab />}
+        {tab === "settings" && <SettingsTab />}
+        {tab === "billing" && <BillingTab />}
+      </div>
+    </div>
+  )
+}
+```
+
+## Related Resources
+
+- [nuqs Documentation](https://nuqs.dev/docs)
+- [nuqs Examples](https://nuqs.dev/docs/examples)
+- [URL State Management Best Practices](https://nuqs.dev/docs/best-practices)
